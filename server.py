@@ -16,7 +16,7 @@ import pandas as pd
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 DEVICE_IPS   = ["10.20.141.21","10.20.141.22","10.20.141.23","10.20.141.24"]
 DEVICE_PORT  = 4370
-DEVICE_TIMEOUT = 8
+DEVICE_TIMEOUT = 30   # increased — get_attendance() can be slow on busy devices
 
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 MDB_PATH     = os.path.join(SCRIPT_DIR, "your_backup.mdb")
@@ -71,6 +71,21 @@ def connect_device(ip):
 @app.route("/")
 def index():
     return send_from_directory(SCRIPT_DIR, "dashboard.html")
+
+@app.route("/manifest.json")
+def manifest():
+    return send_from_directory(SCRIPT_DIR, "manifest.json")
+
+@app.route("/sw.js")
+def service_worker():
+    from flask import Response
+    content = open(os.path.join(SCRIPT_DIR, "sw.js")).read()
+    return Response(content, mimetype="application/javascript",
+                    headers={"Service-Worker-Allowed": "/"})
+
+@app.route("/static/<path:filename>")
+def static_files(filename):
+    return send_from_directory(os.path.join(SCRIPT_DIR, "static"), filename)
 
 
 def _check_device_status(ip):
@@ -162,10 +177,14 @@ def today_report():
 
     with ThreadPoolExecutor(max_workers=4) as ex:
         futures = {ex.submit(_pull_today, ip): ip for ip in DEVICE_IPS}
-        dev_results = {}
-        for f in as_completed(futures):
-            r = f.result()
-            dev_results[r["ip"]] = r
+        dev_results = {ip: {"ip": ip, "online": False, "error": "Timeout", "ids": set()} for ip in DEVICE_IPS}
+        for f in as_completed(futures, timeout=DEVICE_TIMEOUT + 5):
+            try:
+                r = f.result()
+                dev_results[r["ip"]] = r
+            except Exception as e:
+                ip = futures[f]
+                dev_results[ip] = {"ip": ip, "online": False, "error": str(e), "ids": set()}
 
     for ip in DEVICE_IPS:
         r = dev_results[ip]

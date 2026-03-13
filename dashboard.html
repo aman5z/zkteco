@@ -3,7 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ZKTeco Attendance Dashboard</title>
+<title>Attendance Dashboard</title>
+<meta name="description" content="ZKTeco Attendance Management Dashboard">
+<meta name="theme-color" content="#0a0e1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Attendance">
+<link rel="manifest" href="/manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -174,6 +180,34 @@ input:focus { border-color: var(--accent); }
 .search-box { position: relative; }
 .search-box input { padding-left: 34px; }
 .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; }
+
+/* PWA INSTALL BANNER */
+.pwa-banner { display:none; position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:var(--surface); border:1px solid rgba(0,212,255,.3); border-radius:12px; padding:12px 18px; z-index:500; box-shadow:0 8px 32px rgba(0,0,0,.4); align-items:center; gap:12px; min-width:280px; max-width:360px; animation:slideUp .3s ease; }
+.pwa-banner.show { display:flex; }
+.pwa-banner-icon { font-size:28px; flex-shrink:0; }
+.pwa-banner-text { flex:1; }
+.pwa-banner-title { font-size:13px; font-weight:700; margin-bottom:2px; }
+.pwa-banner-sub { font-size:11px; color:var(--muted); }
+.pwa-banner-btns { display:flex; gap:6px; flex-shrink:0; }
+.pwa-install-btn { padding:7px 14px; background:var(--accent); color:#000; border:none; border-radius:7px; font-family:var(--sans); font-size:12px; font-weight:700; cursor:pointer; }
+.pwa-dismiss-btn { padding:7px 10px; background:transparent; color:var(--muted); border:1px solid var(--border); border-radius:7px; font-size:12px; cursor:pointer; }
+.pwa-dismiss-btn:hover { color:var(--text); }
+/* MOBILE RESPONSIVE */
+@media(max-width:600px){
+  .header { padding:12px 16px; }
+  .header-title { font-size:15px; }
+  .nav { padding:8px 12px; }
+  .nav-btn { padding:7px 12px; font-size:12px; }
+  .main { padding:16px; }
+  .grid-4 { grid-template-columns:1fr 1fr; }
+  .grid-2,.grid-3 { grid-template-columns:1fr; }
+  .controls { flex-direction:column; align-items:stretch; }
+  .controls .btn { width:100%; }
+  input[type=date] { width:100%; }
+  .card-value { font-size:26px; }
+  table { font-size:12px; }
+  th,td { padding:8px 10px; }
+}
 </style>
 </head>
 <body>
@@ -376,14 +410,23 @@ async function loadOverview() {
       </div>`).join('') || '<div style="color:var(--muted);font-size:13px">No absences today</div>';
 
     // Device list
-    document.getElementById('ov-device-list').innerHTML = data.devices.map(d =>
-      `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);">
-        <div style="font-family:var(--mono);font-size:13px">${d.ip}</div>
-        <div class="status-dot">
-          <div class="dot ${d.online?'online':'offline'}"></div>
-          <span style="color:${d.online?'var(--green)':'var(--red)'};font-size:12px">${d.online?'ONLINE · '+d.punches_today+' punches':'OFFLINE'}</span>
-        </div>
-      </div>`).join('');
+    document.getElementById('ov-device-list').innerHTML = data.devices.map(d => {
+        const isTimeout = !d.online && (d.error||'').toLowerCase().includes('timeout');
+        const color  = d.online ? 'var(--green)' : isTimeout ? 'var(--yellow)' : 'var(--red)';
+        const dotCls = d.online ? 'online' : 'offline';
+        const label  = d.online ? 'ONLINE · '+d.punches_today+' punches'
+                     : isTimeout ? 'SLOW / TIMEOUT — ping OK but attendance fetch failed'
+                     : 'OFFLINE · ' + (d.error||'');
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);">
+          <div style="font-family:var(--mono);font-size:13px">${d.ip}</div>
+          <div class="status-dot" style="flex-direction:column;align-items:flex-end;gap:2px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="dot ${dotCls}"></div>
+              <span style="color:${color};font-size:11px;font-weight:700">${label}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
 
   } catch(e) {
     toast('Error loading overview: ' + e.message, 'error');
@@ -639,6 +682,64 @@ window.addEventListener('load', () => {
   document.getElementById('hist-to').value   = today;
   document.getElementById('hist-from').value = today;
 });
+
+// ── PWA ───────────────────────────────────────────────────────────────────────
+let deferredPrompt = null;
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(r => console.log('SW registered:', r.scope))
+      .catch(e => console.log('SW failed:', e));
+  });
+}
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('pwa-banner').classList.add('show');
+});
+
+document.getElementById('pwa-install-btn').addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  document.getElementById('pwa-banner').classList.remove('show');
+  if (outcome === 'accepted') toast('App installed! 🎉', 'success');
+});
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('pwa-banner').classList.remove('show');
+  toast('App installed successfully!', 'success');
+});
+
+function dismissPWA() {
+  document.getElementById('pwa-banner').classList.remove('show');
+  sessionStorage.setItem('pwa-dismissed', '1');
+}
+
+// Handle ?tab= shortcuts from manifest
+const tabParam = new URLSearchParams(window.location.search).get('tab');
+if (tabParam) {
+  const btn = [...document.querySelectorAll('.nav-btn')]
+    .find(b => b.getAttribute('onclick')?.includes(tabParam));
+  if (btn) btn.click();
+}
+
 </script>
+
+<!-- PWA Install Banner -->
+<div class="pwa-banner" id="pwa-banner">
+  <div class="pwa-banner-icon">📊</div>
+  <div class="pwa-banner-text">
+    <div class="pwa-banner-title">Install App</div>
+    <div class="pwa-banner-sub">Add to home screen for quick access</div>
+  </div>
+  <div class="pwa-banner-btns">
+    <button class="pwa-install-btn" id="pwa-install-btn">Install</button>
+    <button class="pwa-dismiss-btn" onclick="dismissPWA()">✕</button>
+  </div>
+</div>
 </body>
 </html>
