@@ -1,0 +1,39 @@
+{
+    "endpoint": "https://gaes.paceeducation.com/erp-api/sync/empAttSync.php",
+    "devices": [
+        {
+            "device_id": 1,
+            "ip_address": "10.20.141.23",
+            "port": 4370
+        },
+        {
+            "device_id": 2,
+            "ip_address": "10.20.141.24",
+            "port": 4370
+        },
+        {
+            "device_id": 3,
+            "ip_address": "10.20.141.21",
+            "port": 4370
+        }, {
+            "device_id": 4,
+            "ip_address": "10.20.141.22",
+            "port": 4370
+        }
+    ],
+    "buffer_limit": 3,
+    "log_level": "INFO",
+    "name":"GAES-attendance",
+    "telegram": {
+    "bot_token": "7985099852:AAFL_aTu4g5pB-3xaKoUVrZy94oWGOa3HfY",
+    "chat_id": "-1003063465563",
+    "enabled": true,
+    "notifications": {
+      "startup": true,
+      "end_of_day": true,
+      "data_push": true,
+      "errors": true,
+      "device_status": true
+    }
+  }
+}
