@@ -2358,6 +2358,17 @@ def index():
 def dashboard_html():
     return send_from_directory(SCRIPT_DIR, "d.html")
 
+@app.route("/d")
+def dashboard_d():
+    return send_from_directory(SCRIPT_DIR, "d.html")
+
+@app.route("/zk")
+def zk_page():
+    return send_from_directory(SCRIPT_DIR, "zk.html")
+
+@app.route("/ad")
+def ad_page():
+    return send_from_directory(SCRIPT_DIR, "ad.html")
 
 
 @app.route("/static/<path:filename>")
