@@ -455,7 +455,7 @@ async function connectGAS(){
   const isMasked=(rawPass==='\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'||rawPass==='********');
   const pass=isMasked?CFG.gasPass:rawPass;
 
-  // Persist the URL immediately so CFG.gasUrl reflects the current field value
+  // Save URL to localStorage immediately; CFG.gasUrl is a getter on localStorage so it reflects this at once
   const gasUrlVal=(el('sGasUrl').value||'').trim();
   if(gasUrlVal)lset('gasUrl',gasUrlVal);
 
