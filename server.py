@@ -2404,6 +2404,10 @@ def ad_page():
 def static_files(filename):
     return send_from_directory(os.path.join(SCRIPT_DIR, "static"), filename)
 
+@app.route("/js/<path:filename>")
+def js_files(filename):
+    return send_from_directory(os.path.join(SCRIPT_DIR, "js"), filename)
+
 # ==============================================================================
 #  CACHE API
 # ==============================================================================
