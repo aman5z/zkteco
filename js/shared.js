@@ -541,7 +541,7 @@ async function tryGASLogin(){
     } else {
       // Token is already null; clear persisted token too
       lset('gasToken','');
-      const reason = (d&&d.error) ? d.error : 'check credentials';
+      const reason = d?.error ?? 'check credentials';
       console.warn('[GAS] Login returned no token:', d);
       if(el('gasStatusDot'))el('gasStatusDot').className='sb-dot yellow';
       if(el('gasStatusText'))el('gasStatusText').textContent='GAS: '+reason;
