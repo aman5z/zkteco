@@ -4003,7 +4003,8 @@ def test_telegram_report():
     try:
         report_data = _get_absent_data_for_date(date.today())
     except Exception as exc:
-        return jsonify({"ok": False, "message": str(exc)}), 500
+        print("[Telegram] test-report error: {0}".format(exc)); sys.stdout.flush()
+        return jsonify({"ok": False, "message": "Could not build report data. Check server logs."}), 500
     ok = _tg_notifier.send_daily_absent_report(
         absent=report_data.get("absent", []),
         present_count=report_data.get("present_count", 0),
