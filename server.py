@@ -691,6 +691,33 @@ DEPT_WORKDAYS_FALLBACK = {
 }
 DEFAULT_WORKDAYS = {6, 0, 1, 2, 3}
 
+# ── Telegram notifier (loaded lazily after DB is ready) ────────────────────────
+_tg_notifier = None   # type: ignore
+
+def _init_telegram():
+    """Instantiate TelegramNotifier from settings.ini / DB overrides."""
+    global _tg_notifier
+    try:
+        from telegram_notifier import TelegramNotifier
+        token   = _cfg('telegram', 'bot_token',   '') or db_manager.get_setting('tg_bot_token',   '')
+        chat_id = _cfg('telegram', 'chat_id',     '') or db_manager.get_setting('tg_chat_id',     '')
+        enabled = (_cfg('telegram', 'enabled', '1') == '1') or (db_manager.get_setting('tg_enabled', '1') == '1')
+        if not token or not chat_id:
+            print("[Telegram] No token/chat_id configured — notifications disabled"); sys.stdout.flush()
+            return
+        _tg_notifier = TelegramNotifier(
+            bot_token=token,
+            chat_id=chat_id,
+            enabled=enabled,
+            notify_device_status=(_cfg('telegram', 'notify_device_status', '1') == '1'),
+            notify_punches=(       _cfg('telegram', 'notify_punches',       '1') == '1'),
+            notify_daily_report=(  _cfg('telegram', 'notify_daily_report',  '1') == '1'),
+            system_name="Attendance",
+        )
+        print("[Telegram] Notifier ready (chat {0})".format(chat_id)); sys.stdout.flush()
+    except Exception as exc:
+        print("[Telegram] Init failed: {0}".format(exc)); sys.stdout.flush()
+
 # ==============================================================================
 #  FLASK APP
 # ==============================================================================
@@ -1915,7 +1942,14 @@ def _check_device_status(ip):
 _cache_lock = threading.Lock()
 _cache = {"today": None, "last_updated": None, "refreshing": False, "error": None}
 
+# Track device online state across refreshes so we only alert on *changes*
+_device_online_state = {}   # ip -> bool
+
+# Track which (badge, punch_time) pairs we've already notified about
+_notified_punches = set()   # (badge, punch_time) — cleared daily
+
 def _refresh_cache():
+    global _device_online_state, _notified_punches
     with _cache_lock:
         if _cache["refreshing"]: return
         _cache["refreshing"] = True
@@ -1926,6 +1960,15 @@ def _refresh_cache():
     except Exception as e:
         with _cache_lock: _cache["refreshing"] = False; _cache["error"] = str(e)
         return
+
+    # Build badge -> name lookup for punch notifications
+    badge_name_map = {}
+    try:
+        for _, row in emp_df.iterrows():
+            badge_name_map[str(row["Badgenumber"]).strip()] = str(row["Name"]).strip()
+    except Exception:
+        pass
+
     present_badges = set()
     att_results    = {}
     try:
@@ -1933,16 +1976,39 @@ def _refresh_cache():
             print("[Cache] Polling {0}/{1}: {2}".format(idx, len(DEVICE_IPS), ip)); sys.stdout.flush()
             _sse_push({"type":"progress","device":ip,"idx":idx,"total":len(DEVICE_IPS),"status":"polling"})
             result = _pull_single_device(ip, today)
+            is_online = result.get("online", False)
             _sse_push({"type":"progress","device":ip,"idx":idx,"total":len(DEVICE_IPS),
-                       "status":"online" if result.get("online") else "offline",
+                       "status":"online" if is_online else "offline",
                        "punches":result.get("punches_today",0)})
             att_results[ip] = result
             present_badges.update(result.get("badges", set()))
+
+            # ── Telegram: device up/down alert (only on state change) ──
+            prev_online = _device_online_state.get(ip)
+            if prev_online is not None and prev_online != is_online:
+                try:
+                    dev_name = _device_names.get(ip, "")
+                    if _tg_notifier:
+                        if is_online:
+                            threading.Thread(
+                                target=_tg_notifier.notify_device_online,
+                                args=(ip, dev_name), daemon=True).start()
+                        else:
+                            threading.Thread(
+                                target=_tg_notifier.notify_device_offline,
+                                args=(ip, dev_name, result.get("error", "")),
+                                daemon=True).start()
+                except Exception:
+                    pass
+            _device_online_state[ip] = is_online
+
             # Store full punch records to SQLite
             full_records = result.get("full_records", [])
             if full_records:
                 emp_badges  = _emp_cache_for_db()   # returns a set of badge strings
                 punch_store = []
+                new_today_punches = []   # (badge, name, ts) for Telegram
+                today_str = today.strftime("%Y-%m-%d")
                 for (uid, ts) in full_records:
                     badge = _uid_to_badge_cache.get(uid, "")
                     # If the cache-mapped badge is not a known employee but the raw UID
@@ -1956,12 +2022,35 @@ def _refresh_cache():
                     if not effective_badge or effective_badge not in emp_badges:
                         try: db_manager.record_unknown_user(ip, uid)
                         except Exception: pass
+                    # Collect new today-punches for Telegram notification
+                    if ts.startswith(today_str) and (effective_badge, ts) not in _notified_punches:
+                        new_today_punches.append((effective_badge, ts))
+                        _notified_punches.add((effective_badge, ts))
                 try: db_manager.store_punches(punch_store)
                 except Exception as e:
                     print("[DB] store_punches error: {0}".format(e)); sys.stdout.flush()
+
+                # ── Telegram: per-punch notifications (fire-and-forget thread) ──
+                if new_today_punches and _tg_notifier:
+                    def _send_punch_notifs(punches, device_ip):
+                        for bdg, ts in punches:
+                            try:
+                                name = badge_name_map.get(bdg, "")
+                                _tg_notifier.notify_punch(bdg, name, device_ip, ts)
+                            except Exception:
+                                pass
+                    threading.Thread(
+                        target=_send_punch_notifs,
+                        args=(list(new_today_punches), ip),
+                        daemon=True).start()
+
             time.sleep(0.3)
     except Exception as e:
         print("[Cache] Device loop error: {0}".format(e)); sys.stdout.flush()
+
+    # Clear notified-punches set at day rollover so it doesn't grow forever
+    today_prefix = today.strftime("%Y-%m-%d")
+    _notified_punches = {(b, t) for (b, t) in _notified_punches if t.startswith(today_prefix)}
     device_status = []
     try:
         with ThreadPoolExecutor(max_workers=len(DEVICE_IPS)) as ex:
@@ -2112,6 +2201,8 @@ def start_background_refresh():
     t.start()
     start_auto_sync()
     start_email_scheduler()
+    _init_telegram()
+    start_telegram_scheduler()
 
 # ==============================================================================
 #  DATABASE MANAGEMENT ROUTES
@@ -3581,6 +3672,60 @@ def start_email_scheduler():
     t = threading.Thread(target=_email_scheduler_loop, daemon=True)
     t.start()
 
+# ── Telegram scheduler (daily absent report at configured time) ───────────────
+def _telegram_scheduler_loop():
+    """Background thread: send Telegram absent report at configured time every day."""
+    print("[Telegram] Daily report scheduler started"); sys.stdout.flush()
+    while True:
+        try:
+            if not _tg_notifier or not _tg_notifier.notify_daily_report:
+                time.sleep(300); continue
+
+            rpt_hour   = _cfg_int('telegram', 'daily_report_hour',   8)
+            rpt_minute = _cfg_int('telegram', 'daily_report_minute', 10)
+
+            now    = datetime.now()
+            target = now.replace(hour=rpt_hour, minute=rpt_minute, second=0, microsecond=0)
+            if target <= now:
+                target += timedelta(days=1)
+            wait = (target - now).total_seconds()
+            print("[Telegram] Next daily report at {0} (in {1:.0f}m)".format(
+                target.strftime("%H:%M"), wait / 60)); sys.stdout.flush()
+            time.sleep(wait)
+
+            # Fetch absent data fresh from DB (today so far)
+            try:
+                report_data = _get_absent_data_for_date(date.today())
+            except Exception as exc:
+                print("[Telegram] Could not build report data: {0}".format(exc)); sys.stdout.flush()
+                time.sleep(3600); continue
+
+            absent       = report_data.get("absent", [])
+            present_count = report_data.get("present_count", 0)
+            total         = report_data.get("total", 0)
+            date_str      = report_data.get("date", datetime.now().strftime("%d %B %Y"))
+
+            ok = _tg_notifier.send_daily_absent_report(
+                absent=absent,
+                present_count=present_count,
+                total=total,
+                date_str=date_str,
+                dept_order=DEPT_ORDER,
+            )
+            if ok:
+                print("[Telegram] Daily report sent OK"); sys.stdout.flush()
+            else:
+                print("[Telegram] Daily report send failed"); sys.stdout.flush()
+
+        except Exception as e:
+            print("[Telegram] Scheduler error: {0}".format(e)); sys.stdout.flush()
+            time.sleep(3600)
+
+
+def start_telegram_scheduler():
+    t = threading.Thread(target=_telegram_scheduler_loop, daemon=True)
+    t.start()
+
 # ── Notice Board (Announcements) ────────────────────────────────────────────────
 @app.route("/api/announcements", methods=["GET"])
 def get_announcements():
@@ -3799,7 +3944,74 @@ def save_email_settings():
                            "enabled={0}".format(data.get("enabled")), request.remote_addr)
     return jsonify({"ok": True})
 
-def _get_absent_data_for_date(target_date):
+# ── Telegram settings API ──────────────────────────────────────────────────────
+@app.route("/api/settings/telegram", methods=["GET"])
+@admin_required
+def get_telegram_settings():
+    s = db_manager.get_setting
+    token = s("tg_bot_token", "") or _cfg("telegram", "bot_token", "")
+    chat  = s("tg_chat_id",   "") or _cfg("telegram", "chat_id",   "")
+    return jsonify({
+        "enabled":              s("tg_enabled",              "1") == "1",
+        "bot_token":            "••••" + token[-4:] if len(token) > 4 else ("••••" if token else ""),
+        "token_set":            bool(token),
+        "chat_id":              chat,
+        "notify_device_status": s("tg_notify_device_status", "1") == "1",
+        "notify_punches":       s("tg_notify_punches",       "1") == "1",
+        "notify_daily_report":  s("tg_notify_daily_report",  "1") == "1",
+        "daily_report_hour":    int(s("tg_daily_report_hour",   "8")),
+        "daily_report_minute":  int(s("tg_daily_report_minute", "10")),
+    })
+
+@app.route("/api/settings/telegram", methods=["POST"])
+@admin_required
+def save_telegram_settings():
+    global _tg_notifier
+    data = request.get_json() or {}
+    s = db_manager.set_setting
+    s("tg_enabled",              "1" if data.get("enabled", True) else "0")
+    s("tg_chat_id",              str(data.get("chat_id", "")).strip())
+    s("tg_notify_device_status", "1" if data.get("notify_device_status", True) else "0")
+    s("tg_notify_punches",       "1" if data.get("notify_punches",       True) else "0")
+    s("tg_notify_daily_report",  "1" if data.get("notify_daily_report",  True) else "0")
+    s("tg_daily_report_hour",    str(int(data.get("daily_report_hour",   8))))
+    s("tg_daily_report_minute",  str(int(data.get("daily_report_minute", 10))))
+    # Only update token if a new one was provided (not the masked placeholder)
+    new_token = str(data.get("bot_token", "")).strip()
+    if new_token and "•" not in new_token:
+        s("tg_bot_token", new_token)
+    db_manager.write_audit(session.get("username","?"), "UPDATE_TELEGRAM_SETTINGS",
+                           "enabled={0}".format(data.get("enabled")), request.remote_addr)
+    # Re-init notifier with new settings
+    _init_telegram()
+    return jsonify({"ok": True})
+
+@app.route("/api/settings/telegram/test", methods=["POST"])
+@admin_required
+def test_telegram():
+    if not _tg_notifier:
+        return jsonify({"ok": False, "message": "Telegram not configured. Set bot_token and chat_id first."})
+    ok = _tg_notifier.test_connection()
+    return jsonify({"ok": ok, "message": "Test message sent!" if ok else "Send failed — check token and chat_id."})
+
+@app.route("/api/settings/telegram/test-report", methods=["POST"])
+@admin_required
+def test_telegram_report():
+    """Send a test daily report via Telegram (using today's data)."""
+    if not _tg_notifier:
+        return jsonify({"ok": False, "message": "Telegram not configured."})
+    try:
+        report_data = _get_absent_data_for_date(date.today())
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+    ok = _tg_notifier.send_daily_absent_report(
+        absent=report_data.get("absent", []),
+        present_count=report_data.get("present_count", 0),
+        total=report_data.get("total", 0),
+        date_str=report_data.get("date", ""),
+        dept_order=DEPT_ORDER,
+    )
+    return jsonify({"ok": ok, "message": "Report sent!" if ok else "Send failed."})
     """
     Fetch absent/present data for a specific date from the SQLite punches table.
     target_date: a datetime.date object
