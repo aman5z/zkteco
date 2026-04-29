@@ -508,6 +508,8 @@ async function connectGAS(){
         lset('gasPass','');
         if(el('sGasPass'))el('sGasPass').value='';
         if(res){res.textContent+=' — stored password cleared, please re-enter';res.style.color='var(--red)';}
+        // Also clear from server DB to break the restoration loop on next page reload
+        zkAPI('/api/settings/system',{method:'POST',body:JSON.stringify({gas_pass:''})}).catch(()=>{});
       }
     }
   }catch(e){if(res){res.textContent=e.message;res.style.color='var(--red)';}}
@@ -543,6 +545,13 @@ async function tryGASLogin(){
       lset('gasToken','');
       const reason = d?.error ?? 'check credentials';
       console.warn('[GAS] Login returned no token:', d);
+      // If credentials are definitively wrong, clear stored password from both
+      // localStorage and server DB to prevent the endless restoration loop
+      if(reason === 'Invalid credentials' || (reason && reason.includes('Invalid'))){
+        lset('gasPass','');
+        zkAPI('/api/settings/system',{method:'POST',body:JSON.stringify({gas_pass:''})}).catch(()=>{});
+        console.warn('[GAS] Cleared stored GAS password (invalid credentials)');
+      }
       if(el('gasStatusDot'))el('gasStatusDot').className='sb-dot yellow';
       if(el('gasStatusText'))el('gasStatusText').textContent='GAS: '+reason;
     }

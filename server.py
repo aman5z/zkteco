@@ -4056,6 +4056,10 @@ def save_telegram_settings():
 @app.route("/api/settings/telegram/test", methods=["POST"])
 @admin_required
 def test_telegram():
+    global _tg_notifier
+    # Re-init if notifier is None (e.g. after server restart with DB-stored credentials)
+    if not _tg_notifier:
+        _init_telegram()
     if not _tg_notifier:
         return jsonify({"ok": False, "message": "Telegram not configured. Set bot_token and chat_id first."})
     ok = _tg_notifier.test_connection()
@@ -4065,6 +4069,10 @@ def test_telegram():
 @admin_required
 def test_telegram_report():
     """Send a test daily report via Telegram (using today's data)."""
+    global _tg_notifier
+    # Re-init if notifier is None (e.g. after server restart with DB-stored credentials)
+    if not _tg_notifier:
+        _init_telegram()
     if not _tg_notifier:
         return jsonify({"ok": False, "message": "Telegram not configured."})
     try:
