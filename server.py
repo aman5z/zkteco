@@ -2898,6 +2898,17 @@ def history_report():
                 pass
     except Exception as e:
         print("[History] Punch load error: {0}".format(e))
+    # Supplement today's punch badges with the in-memory cache (populated from
+    # direct device polling), so the history report reflects the same present
+    # count as the Today view rather than only punches stored to SQLite so far.
+    today_date = date.today()
+    if date_from <= today_date <= date_to:
+        with _cache_lock:
+            cached_today = _cache.get("today")
+        if cached_today:
+            cached_present_badges = {e["code"] for e in (cached_today.get("present") or [])}
+            date_badges.setdefault(today_date, set()).update(cached_present_badges)
+
     all_dates = pd.date_range(date_from, date_to).date
     days_data = []
 
@@ -3033,6 +3044,14 @@ def export_history():
                 pass
     except Exception as e:
         return jsonify({"error": "Could not load punch data: " + str(e)}), 500
+    # Supplement today's badges with the in-memory cache (same fix as history_report).
+    today_date = date.today()
+    if date_from <= today_date <= date_to:
+        with _cache_lock:
+            cached_today = _cache.get("today")
+        if cached_today:
+            cached_present_badges = {e["code"] for e in (cached_today.get("present") or [])}
+            date_badges_ex.setdefault(today_date, set()).update(cached_present_badges)
     all_absent = []
     for d in pd.date_range(date_from, date_to).date:
         present = date_badges_ex.get(d, set())
