@@ -94,7 +94,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                     badge: d.badge || d.username, permissions: d.permissions || {},
                     theme: d.theme || 'dark', source: 'zk'
                 });
-                tryGASLogin(d.username, d.username);
+                tryGASLogin();
             }
         }
     } catch(e) {}
