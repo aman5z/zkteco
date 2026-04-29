@@ -376,7 +376,7 @@ async function gasAPI(params){
   const url=CFG.gasUrl;
   if(!url)throw new Error('GAS URL not configured. Go to Settings and enter your Apps Script URL.');
 
-  // Cache GET-like requests
+  // Cache GET-like requests (compute key before adding token so cache is token-agnostic)
   const cacheKey = JSON.stringify(params);
   const isCacheable = ['getTickets', 'getCounters', 'getFiles', 'getUsers'].includes(params.action);
   if (isCacheable && _gasCache.has(cacheKey)) {
@@ -384,19 +384,24 @@ async function gasAPI(params){
      if (Date.now() - cached.ts < 300000) return cached.data; // 5 min cache
   }
 
-  // Always attach token if we have one
-  if(STATE.token)params.token=STATE.token;
+  // Build payload without mutating the original params object
+  const payload = STATE.token ? {...params, token: STATE.token} : {...params};
   const r=await fetch(url,{
     method:'POST',
     redirect:'follow',
-    body:new URLSearchParams(params)
+    body:new URLSearchParams(payload)
   });
   const txt=await r.text();
   const parsed=tryJ(txt);
   // Surface errors clearly
   if(parsed===null&&txt)throw new Error('GAS response not JSON: '+txt.substring(0,80));
   if(typeof parsed==='string'){
-    if(parsed==='Unauthorized') { console.warn('GAS: Not authenticated. Re-login or check GAS URL.'); return {error: 'Unauthorized'}; }
+    if(parsed==='Unauthorized') {
+      // Stale token — clear it so subsequent calls don't keep sending it
+      STATE.token=null; lset('gasToken','');
+      console.warn('GAS: Not authenticated. Re-login or check GAS URL.');
+      return {error: 'Unauthorized'};
+    }
     if(parsed.includes('Invalid')) { console.warn('GAS: Invalid credentials'); return {error: 'Invalid credentials'}; }
     if(parsed.includes('Error')) { console.warn('GAS: '+parsed.substring(0,100)); return {error: parsed}; }
   }
@@ -446,11 +451,17 @@ async function connectGAS(){
   const res=el('gasConnectResult');
   const email=(el('sGasEmail')&&el('sGasEmail').value||'').trim();
   const rawPass=(el('sGasPass')&&el('sGasPass').value||'').trim();
-  // If the field shows the masked dots, use the stored real pass instead
-  const pass=(rawPass==='\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'||rawPass==='********')?CFG.gasPass:rawPass;
-  lset('gasUrl',(el('sGasUrl').value||'').trim());
+  // If the field shows the masked placeholder, use the stored real pass instead
+  const isMasked=(rawPass==='\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'||rawPass==='********');
+  const pass=isMasked?CFG.gasPass:rawPass;
+
+  // Persist the URL immediately so CFG.gasUrl reflects the current field value
+  const gasUrlVal=(el('sGasUrl').value||'').trim();
+  if(gasUrlVal)lset('gasUrl',gasUrlVal);
+
   if(!CFG.gasUrl){if(res){res.textContent='Enter GAS URL first';res.style.color='var(--red)'}return}
   if(res){res.textContent='Connecting...';res.style.color='var(--text2)'}
+
   if(!email){
     try{
       const d=await gasAPI({action:'getDashboard'});
@@ -458,13 +469,30 @@ async function connectGAS(){
     }catch(e){}
     if(res){res.textContent='Enter email + password';res.style.color='var(--yellow)'}return;
   }
+
+  // Guard: password must be resolved before attempting login
+  if(!pass){
+    if(res){
+      res.textContent=isMasked?'Stored password missing — re-enter your GAS password and try again':'Enter your GAS password';
+      res.style.color='var(--yellow)';
+    }
+    // Clear any stale stored password so the user can type a fresh one
+    if(isMasked){lset('gasPass','');if(el('sGasPass'))el('sGasPass').value='';}
+    return;
+  }
+
+  // Clear any stale session token before a fresh login
+  STATE.token=null;
+
+  // Persist credentials up-front so tryGASLogin can use them after ZK auth
+  lset('gasEmail',email);
+  lset('gasPass',pass);
+
   try{
-    const d=await gasAPI({action:'login',email,password:pass||email});
+    const d=await gasAPI({action:'login',email,password:pass});
     if(d&&d.token){
       STATE.token=d.token;
-      lset('gasToken', d.token);  // persist so reload restores it
-      lset('gasEmail',email);
-      if(pass&&pass.length>1&&pass!=='\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022')lset('gasPass',pass);
+      lset('gasToken', d.token);
       if(res){res.textContent='Connected as '+email+' ['+d.role+']';res.style.color='var(--green)';}
       if(el('gasStatusDot'))el('gasStatusDot').className='sb-dot green';
       if(el('gasStatusText'))el('gasStatusText').textContent='GAS: '+d.role;
@@ -472,21 +500,31 @@ async function connectGAS(){
       if(can('storage'))loadDrive();
       toast('GAS connected');
     }else{
-      if(res){res.textContent='Login failed: '+(typeof d==='string'?d:'check credentials');res.style.color='var(--red)';}
+      // Show specific error if available, otherwise generic message
+      const errMsg=d&&d.error?d.error:'check credentials';
+      if(res){res.textContent='Login failed: '+errMsg;res.style.color='var(--red)';}
+      // If the password we tried was the masked/stored one, it's wrong — clear it
+      if(isMasked){
+        lset('gasPass','');
+        if(el('sGasPass'))el('sGasPass').value='';
+        if(res){res.textContent+=' — stored password cleared, please re-enter';res.style.color='var(--red)';}
+      }
     }
   }catch(e){if(res){res.textContent=e.message;res.style.color='var(--red)';}}
 }
 
-async function tryGASLogin(zkUsername, zkPassword){
+async function tryGASLogin(){
   // Always re-authenticate with stored admin GAS credentials on every page load.
   // GAS tokens expire, so restoring a stale token from localStorage causes Drive 401.
-  const savedEmail = CFG.gasEmail || ls('gasEmail') || '';
-  const savedPass  = CFG.gasPass  || ls('gasPass')  || '';
+  const savedEmail = ls('gasEmail') || '';
+  const savedPass  = ls('gasPass')  || '';
   if(!CFG.gasUrl || !savedEmail || !savedPass) {
     if(el('gasStatusDot'))el('gasStatusDot').className='sb-dot muted';
     if(el('gasStatusText'))el('gasStatusText').textContent='GAS: No creds';
     return;
   }
+  // Always start with a clean token so the login request is not polluted by an expired one
+  STATE.token=null;
   try{
     const d = await gasAPI({action:'login', email:savedEmail, password:savedPass});
     if(d && d.token){
@@ -501,11 +539,14 @@ async function tryGASLogin(zkUsername, zkPassword){
       if(res){res.textContent='✅ GAS connected (auto)';res.style.color='var(--green)';}
       console.log('[GAS] Auto-login OK as', savedEmail);
     } else {
+      // Token is already null; clear persisted token too
+      lset('gasToken','');
       console.warn('[GAS] Login returned no token:', d);
       if(el('gasStatusDot'))el('gasStatusDot').className='sb-dot yellow';
       if(el('gasStatusText'))el('gasStatusText').textContent='GAS: Auth failed';
     }
   } catch(e) {
+    lset('gasToken','');
     console.warn('[GAS] Auto-login failed:', e.message);
     if(el('gasStatusDot'))el('gasStatusDot').className='sb-dot muted';
     if(el('gasStatusText'))el('gasStatusText').textContent='GAS: Offline';
@@ -545,7 +586,7 @@ async function doLogin(){
           });
           spin(false);
           // Auto-connect to GAS
-          await tryGASLogin(username, password||username);
+          await tryGASLogin();
           return;
         }
       }
