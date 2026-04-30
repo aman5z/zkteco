@@ -311,7 +311,8 @@ function quickSaveSettings(){
     gas_url:el('qsGasUrl').value||'',
     zk_url:el('qsZkUrl').value||'',
   };
-  if(el('qsGasEmail')&&el('qsGasEmail').value.trim())qsPayload.gas_email=el('qsGasEmail').value.trim();
+  const qsEmail=(el('qsGasEmail')?.value||'').trim();
+  if(qsEmail)qsPayload.gas_email=qsEmail;
   if(qsRawPass)qsPayload.gas_pass=qsRawPass;
   zkAPI('/api/settings/system',{method:'POST',body:JSON.stringify(qsPayload)}).catch(e=>console.warn('[Settings] Server persist failed:',e.message));
   applyBranding();
@@ -567,7 +568,7 @@ async function tryGASLogin(){
       console.warn('[GAS] Login returned no token:', d);
       // If credentials are definitively wrong, clear stored password from both
       // localStorage and server DB to prevent the endless restoration loop
-      if(reason === 'Invalid credentials' || (reason && reason.includes('Invalid'))){
+      if(reason && reason.includes('Invalid')){
         _clearGASPass();
         console.warn('[GAS] Cleared stored GAS password (invalid credentials)');
       }

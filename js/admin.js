@@ -214,11 +214,14 @@ async function saveTelegramSettings(){
     if(res){res.textContent='❌ '+e.message;res.style.color='var(--red)';}
   }
 }
-async function testTelegramMessage(){
-  const res=el('tgTestResult');
-  // Auto-save first if a new token is typed in the field (prevents "not configured" error)
+/** Auto-save Telegram settings if a new token is typed, to prevent "not configured" errors. */
+async function _ensureTelegramSettingsSaved(){
   const newToken=(el('tgBotToken')?.value||'').trim();
   if(newToken){await saveTelegramSettings();}
+}
+async function testTelegramMessage(){
+  const res=el('tgTestResult');
+  await _ensureTelegramSettingsSaved();
   if(res){res.textContent='Sending test message...';res.style.color='var(--text2)';}
   try{
     const d=await zkAPI('/api/settings/telegram/test',{method:'POST'});
@@ -233,9 +236,7 @@ async function testTelegramMessage(){
 }
 async function testTelegramReport(){
   const res=el('tgTestResult');
-  // Auto-save first if a new token is typed in the field (prevents "not configured" error)
-  const newToken=(el('tgBotToken')?.value||'').trim();
-  if(newToken){await saveTelegramSettings();}
+  await _ensureTelegramSettingsSaved();
   if(res){res.textContent='Sending test absent report...';res.style.color='var(--text2)';}
   try{
     const d=await zkAPI('/api/settings/telegram/test-report',{method:'POST'});
