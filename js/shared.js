@@ -298,7 +298,8 @@ async function testEmailConfig() {
 }
 function quickSaveSettings(){
   if(el('qsGasEmail')&&el('qsGasEmail').value)lset('gasEmail',el('qsGasEmail').value.trim());
-  if(el('qsGasPass')&&el('qsGasPass').value)lset('gasPass',el('qsGasPass').value);
+  const qsRawPass=(el('qsGasPass')&&el('qsGasPass').value||'').trim();
+  if(qsRawPass)lset('gasPass',qsRawPass);
   lset('company',el('qsCompany').value||'ERP Console');
   lset('domain',el('qsDomain').value||'company.local');
   lset('zkUrl',el('qsZkUrl').value||'http://localhost:5000');
@@ -310,9 +311,9 @@ function quickSaveSettings(){
     gas_url:el('qsGasUrl').value||'',
     zk_url:el('qsZkUrl').value||'',
   };
-  if(el('qsGasEmail')&&el('qsGasEmail').value)qsPayload.gas_email=el('qsGasEmail').value.trim();
-  if(el('qsGasPass')&&el('qsGasPass').value)qsPayload.gas_pass=el('qsGasPass').value;
-  zkAPI('/api/settings/system',{method:'POST',body:JSON.stringify(qsPayload)}).catch(()=>{});
+  if(el('qsGasEmail')&&el('qsGasEmail').value.trim())qsPayload.gas_email=el('qsGasEmail').value.trim();
+  if(qsRawPass)qsPayload.gas_pass=qsRawPass;
+  zkAPI('/api/settings/system',{method:'POST',body:JSON.stringify(qsPayload)}).catch(e=>console.warn('[Settings] Server persist failed:',e.message));
   applyBranding();
   closeModal('settingsModal');
   toast('✅ Settings saved');
@@ -504,7 +505,7 @@ async function connectGAS(){
       STATE.token=d.token;
       lset('gasToken', d.token);
       // Persist credentials to server DB so they survive page refreshes and session loss
-      zkAPI('/api/settings/system',{method:'POST',body:JSON.stringify({gas_email:email,gas_pass:pass})}).catch(()=>{});
+      zkAPI('/api/settings/system',{method:'POST',body:JSON.stringify({gas_email:email,gas_pass:pass})}).catch(e=>console.warn('[GAS] Credential persist failed:',e.message));
       if(res){res.textContent='Connected as '+email+' ['+d.role+']';res.style.color='var(--green)';}
       if(el('gasStatusDot'))el('gasStatusDot').className='sb-dot green';
       if(el('gasStatusText'))el('gasStatusText').textContent='GAS: '+d.role;
@@ -521,10 +522,17 @@ async function connectGAS(){
         if(el('sGasPass'))el('sGasPass').value='';
         if(res){res.textContent+=' — stored password cleared, please re-enter';res.style.color='var(--red)';}
         // Also clear from server DB to break the restoration loop on next page reload
-        zkAPI('/api/settings/system',{method:'POST',body:JSON.stringify({gas_pass:''})}).catch(()=>{});
+        _clearGASPass();
       }
     }
   }catch(e){if(res){res.textContent=e.message;res.style.color='var(--red)';}}
+}
+
+/** Clear stored GAS password from localStorage and server DB (invalid credentials). */
+function _clearGASPass(){
+  lset('gasPass','');
+  zkAPI('/api/settings/system',{method:'POST',body:JSON.stringify({gas_pass:''})})
+    .catch(e=>console.warn('[GAS] DB password clear failed:',e.message));
 }
 
 async function tryGASLogin(){
@@ -560,8 +568,7 @@ async function tryGASLogin(){
       // If credentials are definitively wrong, clear stored password from both
       // localStorage and server DB to prevent the endless restoration loop
       if(reason === 'Invalid credentials' || (reason && reason.includes('Invalid'))){
-        lset('gasPass','');
-        zkAPI('/api/settings/system',{method:'POST',body:JSON.stringify({gas_pass:''})}).catch(()=>{});
+        _clearGASPass();
         console.warn('[GAS] Cleared stored GAS password (invalid credentials)');
       }
       if(el('gasStatusDot'))el('gasStatusDot').className='sb-dot yellow';
