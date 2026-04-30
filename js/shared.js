@@ -199,13 +199,12 @@ async function saveSettings(){
       method: 'POST',
       body: JSON.stringify(payload)
     });
-    if (res.ok) {
-       lset('company',co);
-       lset('domain',dom);
-       lset('logoEmoji',logoStr);
-       applyBranding();
-       toast('✅ Settings saved to server');
-    }
+    // zkAPI returns parsed JSON body; treat any successful response (no throw) as saved
+    lset('company',co);
+    lset('domain',dom);
+    lset('logoEmoji',logoStr);
+    applyBranding();
+    toast('✅ Settings saved to server');
   } catch(e) {
     // Fallback
     lset('company',co);
@@ -253,11 +252,10 @@ async function saveEmailSettings() {
       method: 'POST',
       body: JSON.stringify(payload)
     });
-    if (res.ok) {
-      toast('✅ Email settings saved!');
-      el('emailTestResult').textContent = '✅ Saved successfully';
-      el('emailTestResult').style.color = 'var(--green)';
-    }
+    // zkAPI returns parsed JSON; treat any non-throwing response as saved
+    toast('✅ Email settings saved!');
+    el('emailTestResult').textContent = '✅ Saved successfully';
+    el('emailTestResult').style.color = 'var(--green)';
   } catch (e) {
     el('emailTestResult').textContent = '❌ Save failed: ' + e.message;
     el('emailTestResult').style.color = 'var(--red)';
@@ -426,6 +424,7 @@ async function gasAPI(params){
 
 // Auto-fill employee info from ZK database when badge is typed
 let _empBadgeTimer=null;
+let _msgPollTimer=null;
 function autoFillFromBadge(val){
   const hint=el('uBadgeLookupResult');
   if(!val||val.length<1){if(hint)hint.textContent='';return}
@@ -762,6 +761,7 @@ function doLogout(){
   el('demoIndicator').style.display='none';
   clearInterval(STATE._clockTimer);
   clearInterval(STATE._pollTimer);
+  clearInterval(STATE._msgPollTimer);
 }
 
 // ===========================================================================

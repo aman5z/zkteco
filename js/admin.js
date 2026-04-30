@@ -20,7 +20,7 @@ async function runSync(mode){
   if(STATE.isDemo){toast('🎮 Demo');return}
   el('syncMsg').textContent='⏳ Syncing...';el('syncMsg').style.color='var(--yellow)';
   try{
-    const path=mode==='full'?'/api/cache/refresh':'/api/cache/refresh';
+    const path=mode==='full'?'/api/cache/force-refresh':'/api/cache/refresh';
     const d=await zkAPI(path,{method:'POST'});
     el('syncMsg').textContent='✅ Sync complete';el('syncMsg').style.color='var(--green)';
     toast('✅ Sync done');loadDBStats();
@@ -29,7 +29,7 @@ async function runSync(mode){
 async function createBackup(){
   if(STATE.isDemo){toast('🎮 Demo');return}
   try{
-    const d=await zkAPI('/api/db/backup',{method:'POST'});
+    const d=await zkAPI('/api/db/backup');
     el('backupMsg').textContent='✅ Backup created';el('backupMsg').style.color='var(--green)';
     toast('✅ Backup created');
   }catch(e){el('backupMsg').textContent='❌ '+e.message;el('backupMsg').style.color='var(--red)'}
@@ -171,7 +171,7 @@ async function loadSessions(){
 }
 async function killSession(sid,username){
   if(!confirm('Force logout '+username+'?'))return;
-  try{await zkAPI('/api/sessions/user/'+username,{method:'POST'});toast('✅ Session terminated');loadSessions()}catch(e){toast('❌ '+e.message)}
+  try{await zkAPI('/api/sessions/user/'+username,{method:'DELETE'});toast('✅ Session terminated');loadSessions()}catch(e){toast('❌ '+e.message)}
 }
 
 // ===========================================================================

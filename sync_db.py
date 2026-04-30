@@ -754,7 +754,9 @@ def main():
 
     if "backup" in args:
         create_backup()
-        input("\nPress Enter to exit..."); return
+        if sys.stdin.isatty():
+            input("\nPress Enter to exit...")
+        return
 
     print("[1] Initialising database schema...")
     db_conn = init_db()
@@ -823,7 +825,8 @@ def main():
         print("\n  ⚠  {0} UIDs couldn't be matched.".format(unmapped_c))
         print("     Dashboard → Admin → Unmapped Users to resolve.")
     print("\n  Dashboard will now use attendance.db automatically.")
-    input("\nPress Enter to exit...")
+    if sys.stdin.isatty():
+        input("\nPress Enter to exit...")
 
 if __name__ == "__main__":
     main()
