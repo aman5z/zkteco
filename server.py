@@ -2552,7 +2552,8 @@ def force_refresh():
 @permission_required("force_refresh")
 def force_full_refresh():
     """Full sync: re-pulls from devices then rebuilds the cache."""
-    _ensure_synced.__globals__['_local_sync_time'] = 0  # reset sync timer to force re-pull
+    global _local_sync_time
+    _local_sync_time = 0  # reset sync timer to force re-pull on next _ensure_synced call
     t = threading.Thread(target=_refresh_cache)
     t.daemon = True
     t.start()
@@ -3183,7 +3184,7 @@ def get_raw_punches():
             "dept":       r["dept"]  or "",
         } for r in rows])
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to load punch records"}), 500
 
 @app.route("/api/history/export")
 @permission_required("export_reports")
@@ -4328,7 +4329,7 @@ def api_add_holiday():
     try:
         hid = add_holiday(date_val, date_end, label, scope, dept, employees)
         db_manager.write_audit(session.get("username","?"), "ADD_HOLIDAY",
-                               "{0} on {1} scope={2}".format(label, date, scope),
+                               "{0} on {1} scope={2}".format(label, date_val, scope),
                                request.remote_addr)
         return jsonify({"ok": True, "id": hid})
     except Exception as e:

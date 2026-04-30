@@ -4,6 +4,7 @@ const ADMIN_EMAIL_CFG = "amanfaizal04@gmail.com";
 const WHATSAPP_NUMBER = "917356188530";
 const WHATSAPP_APIKEY = "YOUR_API_KEY";
 const SESSION_HOURS   = 24;
+const MAX_CACHE_TTL_SECONDS = 21600; // Google Apps Script cache max is 6 hours (21600s)
 const ALL_PERMS = ["users","dashboard","audit","storage","tokens","tokens.manage","tickets","tickets.manage"];
 
 /* ── ROUTER ── */
@@ -63,7 +64,7 @@ function login(e) {
         try { perms = data[i][9] ? JSON.parse(data[i][9]) : null; } catch(err) { perms = null; }
         if (!perms) perms = defaultPerms(role);
       }
-      CacheService.getScriptCache().put(token, JSON.stringify({ email, role, expiry, perms }), Math.min(SESSION_HOURS * 3600, 21600));
+      CacheService.getScriptCache().put(token, JSON.stringify({ email, role, expiry, perms }), Math.min(SESSION_HOURS * 3600, MAX_CACHE_TTL_SECONDS));
       sheet.getRange(i + 1, 9).setValue(new Date());
       auditLog(email, "LOGIN", "Signed in [" + role + "]");
       return ContentService.createTextOutput(JSON.stringify({ token, role, email, perms }))
