@@ -53,7 +53,7 @@ function login(e) {
   const hashed = hash(pass);
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] === email && data[i][1] === hashed) {
-      if (data[i][6] === false || data[i][6] === 0 || data[i][6] === "FALSE" || data[i][6] === "false") return j("Account disabled");
+      if (!data[i][6] || String(data[i][6]).toLowerCase() === "false") return j("Account disabled");
       const token  = Utilities.getUuid();
       const expiry = new Date(Date.now() + SESSION_HOURS * 3600000);
       const role   = data[i][2] || "User";
@@ -320,12 +320,14 @@ function updateTicket(e) {
   const u = authAny(e); if (!u) return j("Unauthorized");
   if (u.role!=="Admin" && !(u.perms||[]).includes("tickets.manage")) return j("Insufficient permissions");
   const sheet = ss().getSheetByName("Tickets"), data = sheet.getDataRange().getValues();
+  if (!e.parameter.status && !e.parameter.assignedTo) return j("Nothing to update");
   for (let i = 1; i < data.length; i++) {
     if (data[i][0]===e.parameter.ticketId) {
-      if (e.parameter.status)     sheet.getRange(i+1,8).setValue(e.parameter.status);
-      if (e.parameter.assignedTo) sheet.getRange(i+1,9).setValue(e.parameter.assignedTo);
+      const changes=[];
+      if (e.parameter.status)    {sheet.getRange(i+1,8).setValue(e.parameter.status);    changes.push("status="+e.parameter.status);}
+      if (e.parameter.assignedTo){sheet.getRange(i+1,9).setValue(e.parameter.assignedTo);changes.push("assignedTo="+e.parameter.assignedTo);}
       sheet.getRange(i+1,10).setValue(new Date());
-      auditLog(u.email,"UPDATE_TICKET",e.parameter.ticketId+" → "+(e.parameter.status||e.parameter.assignedTo||"updated"));
+      auditLog(u.email,"UPDATE_TICKET",e.parameter.ticketId+": "+changes.join(", "));
       return j("Updated");
     }
   }
