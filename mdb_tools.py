@@ -76,9 +76,113 @@ def find_mdb(explicit=None):
             return os.path.join(SCRIPT_DIR, f)
     return None
 
+# ── Cross-platform MDB helpers (mdbtools on Linux/macOS/Android, pyodbc on Windows) ──
+
+def _use_mdbtools():
+    """True on Linux/macOS/Android — platforms where mdbtools is used instead of pyodbc."""
+    return not sys.platform.startswith("win")
+
+class _MdbToolsCursor:
+    """Minimal cursor-like object backed by mdbtools for cmd_scan compatibility."""
+    def __init__(self, conn):
+        self._conn = conn
+        self._last_count = "?"
+
+    def tables(self, tableType=None):
+        class Row:
+            def __init__(self, name): self.table_name = name
+        return [Row(t) for t in self._conn._tables]
+
+    def columns(self, table):
+        try:
+            df = self._conn.read_table(table)
+            class ColRow:
+                def __init__(self, name): self.column_name = name
+            return [ColRow(c) for c in df.columns]
+        except Exception:
+            return []
+
+    def execute(self, sql):
+        import re
+        m = re.search(r'FROM\s+\[?(\w+)\]?', sql, re.IGNORECASE)
+        if m and 'COUNT' in sql.upper():
+            try:
+                df = self._conn.read_table(m.group(1))
+                self._last_count = len(df)
+            except Exception:
+                self._last_count = "?"
+        return self
+
+    def fetchone(self):
+        return [self._last_count]
+
+class _MdbToolsConn:
+    """MDB connection via mdbtools CLI (Linux, macOS, Android/Termux)."""
+    def __init__(self, mdb_path):
+        import subprocess
+        self.mdb_path = mdb_path
+        r = subprocess.run(["mdb-tables", "-1", mdb_path],
+                           capture_output=True, text=True, timeout=10)
+        if r.returncode != 0:
+            if sys.platform == "darwin":
+                hint = "brew install mdbtools"
+            elif "com.termux" in os.environ.get("PREFIX", ""):
+                hint = "pkg install mdbtools"
+            else:
+                hint = "sudo apt install mdbtools"
+            raise RuntimeError(
+                "mdbtools error: " + r.stderr.strip() + "\nInstall with: " + hint
+            )
+        self._tables = [t.strip() for t in r.stdout.splitlines() if t.strip()]
+
+    def read_table(self, table_name):
+        import subprocess, io
+        import pandas as pd
+        r = subprocess.run(["mdb-export", self.mdb_path, table_name],
+                           capture_output=True, text=True, timeout=60)
+        if r.returncode != 0:
+            raise RuntimeError("mdb-export failed for {0}: {1}".format(
+                table_name, r.stderr.strip()))
+        return pd.read_csv(io.StringIO(r.stdout), dtype=str)
+
+    def close(self): pass
+
+    def cursor(self): return _MdbToolsCursor(self)
+
+def _mdb_read_sql(sql, conn):
+    """Execute a simple SELECT and return a DataFrame, works for both pyodbc and _MdbToolsConn."""
+    if not isinstance(conn, _MdbToolsConn):
+        import pandas as pd
+        return pd.read_sql(sql, conn)
+    import re
+    m = re.search(r'FROM\s+\[?(\w+)\]?', sql, re.IGNORECASE)
+    if not m:
+        raise ValueError("Cannot parse table from SQL: " + sql)
+    df = conn.read_table(m.group(1))
+    # Apply basic date-range WHERE filter (Access # syntax)
+    date_m = re.findall(r'\[?(\w+)\]?\s*(>=|<=|>|<)\s*#([^#]+)#', sql)
+    for col, op, val in date_m:
+        if col in df.columns:
+            try:
+                import pandas as pd
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+                dv = pd.to_datetime(val.strip())
+                if   op == '>=': df = df[df[col] >= dv]
+                elif op == '<=': df = df[df[col] <= dv]
+                elif op == '>':  df = df[df[col] > dv]
+                elif op == '<':  df = df[df[col] < dv]
+            except Exception:
+                pass
+    return df
 
 def connect_mdb(path):
-    """Open an Access MDB/ACCDB connection via pyodbc."""
+    """Open an Access MDB/ACCDB — uses mdbtools on Linux/macOS/Android, pyodbc on Windows."""
+    if _use_mdbtools():
+        try:
+            return _MdbToolsConn(os.path.abspath(path))
+        except Exception as e:
+            print("[ERROR] {0}".format(e))
+            sys.exit(1)
     try:
         import pyodbc
         return pyodbc.connect(
@@ -235,7 +339,7 @@ def cmd_export(argv):
 
     print("\n[1/4] Loading DEPARTMENTS table...")
     try:
-        dept_df = pd.read_sql("SELECT [DEPTID], [DEPTNAME] FROM [DEPARTMENTS]", conn)
+        dept_df = _mdb_read_sql("SELECT [DEPTID], [DEPTNAME] FROM [DEPARTMENTS]", conn)
     except Exception as e:
         print("[ERROR] Could not read DEPARTMENTS: {0}".format(e))
         input("\nPress Enter to exit..."); sys.exit(1)
@@ -248,7 +352,7 @@ def cmd_export(argv):
 
     print("\n[2/4] Loading USERINFO table...")
     try:
-        user_df = pd.read_sql(
+        user_df = _mdb_read_sql(
             "SELECT [Badgenumber], [Name], [DEFAULTDEPTID] FROM [USERINFO]", conn
         )
     except Exception as e:
@@ -431,8 +535,7 @@ def _load_employees():
 
 
 def _mdb_uid_to_badge(conn):
-    import pandas as pd
-    df = pd.read_sql("SELECT [USERID],[Badgenumber] FROM [USERINFO]", conn)
+    df = _mdb_read_sql("SELECT [USERID],[Badgenumber] FROM [USERINFO]", conn)
     df["USERID"]      = df["USERID"].astype(str).str.strip()
     df["Badgenumber"] = df["Badgenumber"].astype(str).str.strip()
     return dict(zip(df["USERID"], df["Badgenumber"]))
@@ -575,7 +678,7 @@ def cmd_history(argv):
             fs + " 00:00:00", ts + " 23:59:59")
     )
     try:
-        punch_df = pd.read_sql(sql, conn)
+        punch_df = _mdb_read_sql(sql, conn)
     except Exception as e:
         print("[ERROR] CHECKINOUT query failed: {0}".format(e)); conn.close(); sys.exit(1)
     conn.close()

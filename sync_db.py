@@ -488,7 +488,67 @@ def find_mdb():
             return os.path.join(SCRIPT_DIR, f)
     return None
 
+def _use_mdbtools():
+    """True on Linux/macOS/Android — platforms where mdbtools is used instead of pyodbc."""
+    return not sys.platform.startswith("win")
+
+class _MdbToolsConn:
+    """MDB connection via mdbtools CLI (Linux, macOS, Android/Termux)."""
+    def __init__(self, mdb_path):
+        import subprocess
+        self.mdb_path = mdb_path
+        r = subprocess.run(["mdb-tables", "-1", mdb_path],
+                           capture_output=True, text=True, timeout=10)
+        if r.returncode != 0:
+            raise RuntimeError("mdbtools error: " + r.stderr.strip())
+        self._tables = [t.strip() for t in r.stdout.splitlines() if t.strip()]
+
+    def read_table(self, table_name):
+        import subprocess, io
+        import pandas as pd
+        r = subprocess.run(["mdb-export", self.mdb_path, table_name],
+                           capture_output=True, text=True, timeout=60)
+        if r.returncode != 0:
+            raise RuntimeError("mdb-export failed for {0}: {1}".format(
+                table_name, r.stderr.strip()))
+        return pd.read_csv(io.StringIO(r.stdout), dtype=str)
+
+    def close(self): pass
+
+def _mdb_read_sql(sql, conn):
+    """Execute a simple SELECT and return a DataFrame, works for both pyodbc and _MdbToolsConn."""
+    if not isinstance(conn, _MdbToolsConn):
+        import pandas as pd
+        return pd.read_sql(sql, conn)
+    import re
+    m = re.search(r'FROM\s+\[?(\w+)\]?', sql, re.IGNORECASE)
+    if not m:
+        raise ValueError("Cannot parse table from SQL: " + sql)
+    df = conn.read_table(m.group(1))
+    # Apply basic date-range WHERE filter (Access # syntax)
+    date_m = re.findall(r'\[?(\w+)\]?\s*(>=|<=|>|<)\s*#([^#]+)#', sql)
+    for col, op, val in date_m:
+        if col in df.columns:
+            try:
+                import pandas as pd
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+                dv = pd.to_datetime(val.strip())
+                if   op == '>=': df = df[df[col] >= dv]
+                elif op == '<=': df = df[df[col] <= dv]
+                elif op == '>':  df = df[df[col] > dv]
+                elif op == '<':  df = df[df[col] < dv]
+            except Exception:
+                pass
+    return df
+
 def connect_mdb(path):
+    if _use_mdbtools():
+        try:
+            return _MdbToolsConn(os.path.abspath(path))
+        except Exception as e:
+            print("  [WARN] mdbtools error: {0}".format(e))
+            print("  Install mdbtools: pkg install mdbtools  (Termux) | brew install mdbtools  (macOS) | sudo apt install mdbtools  (Linux)")
+            return None
     try:
         import pyodbc
         return pyodbc.connect(
@@ -504,10 +564,10 @@ def connect_mdb(path):
 def import_employees_from_mdb(mdb_conn, db_conn):
     try:
         import pandas as pd
-        dept_df  = pd.read_sql("SELECT [DEPTID],[DEPTNAME] FROM [{0}]".format(DEPT_TABLE), mdb_conn)
+        dept_df  = _mdb_read_sql("SELECT [DEPTID],[DEPTNAME] FROM [{0}]".format(DEPT_TABLE), mdb_conn)
         id2dept  = dict(zip(dept_df["DEPTID"].astype(str).str.strip(),
                             dept_df["DEPTNAME"].astype(str).str.strip().str.upper()))
-        user_df  = pd.read_sql(
+        user_df  = _mdb_read_sql(
             "SELECT [USERID],[Badgenumber],[Name],[DEFAULTDEPTID] FROM [{0}]".format(USERINFO_TABLE),
             mdb_conn
         )
@@ -575,7 +635,7 @@ def import_attendance_from_mdb(mdb_conn, db_conn, days=None):
             if row["badge"]: badge_map[row["badge"]] = row["badge"]
         # Also try USERINFO uid mapping
         try:
-            udf = pd.read_sql("SELECT [USERID],[Badgenumber] FROM [{0}]".format(USERINFO_TABLE), mdb_conn)
+            udf = _mdb_read_sql("SELECT [USERID],[Badgenumber] FROM [{0}]".format(USERINFO_TABLE), mdb_conn)
             for _, r in udf.iterrows():
                 uid   = str(r["USERID"]).strip()
                 badge = str(r["Badgenumber"]).strip()
@@ -590,11 +650,11 @@ def import_attendance_from_mdb(mdb_conn, db_conn, days=None):
             sql = "SELECT [USERID],[CHECKTIME] FROM [{0}]".format(CHECKINOUT_TABLE)
 
         try:
-            punch_df = pd.read_sql(sql, mdb_conn)
+            punch_df = _mdb_read_sql(sql, mdb_conn)
         except Exception:
             # Column error fallback — try without date filter then slice in pandas
             try:
-                punch_df = pd.read_sql("SELECT [USERID],[CHECKTIME] FROM [{0}]".format(CHECKINOUT_TABLE), mdb_conn)
+                punch_df = _mdb_read_sql("SELECT [USERID],[CHECKTIME] FROM [{0}]".format(CHECKINOUT_TABLE), mdb_conn)
                 if days:
                     punch_df["CHECKTIME"] = pd.to_datetime(punch_df["CHECKTIME"], errors="coerce")
                     cutoff = datetime.now() - timedelta(days=days)

@@ -1,30 +1,75 @@
 #!/bin/bash
 # ============================================================
-#  ZKTeco Attendance Dashboard  v2.2  --  Linux Launcher
+#  ZKTeco Attendance Dashboard  v2.2  --  Launcher
+#  Supports: Linux, macOS, Termux (Android)
 #  Usage: bash attendance.sh
 # ============================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Activate venv if present, else use system python3
+# ── Detect platform ───────────────────────────────────────────
+detect_platform() {
+    if [ -n "${TERMUX_VERSION:-}" ] || echo "${PREFIX:-}" | grep -q "com.termux" 2>/dev/null; then
+        echo "termux"
+    elif [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
+        echo "macos"
+    else
+        echo "linux"
+    fi
+}
+PLATFORM=$(detect_platform)
+
+# Activate venv if present, else use system python3/python
 if [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
     PYTHON="python3"
-else
+elif command -v python3 &>/dev/null; then
     PYTHON="python3"
+else
+    PYTHON="python"
 fi
 
 # ── Find local IP ─────────────────────────────────────────────
 get_ip() {
-    hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1"
+    case "$PLATFORM" in
+        termux)
+            ip addr show wlan0 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1 \
+                || ip addr show wlan1 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1 \
+                || echo "127.0.0.1"
+            ;;
+        macos)
+            ipconfig getifaddr en0 2>/dev/null \
+                || ipconfig getifaddr en1 2>/dev/null \
+                || echo "127.0.0.1"
+            ;;
+        *)
+            hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1"
+            ;;
+    esac
+}
+
+# ── Open URL in browser ───────────────────────────────────────
+open_browser() {
+    local url="$1"
+    case "$PLATFORM" in
+        termux)
+            termux-open-url "$url" 2>/dev/null || true
+            ;;
+        macos)
+            open "$url" 2>/dev/null || true
+            ;;
+        *)
+            xdg-open "$url" 2>/dev/null || true
+            ;;
+    esac
 }
 
 menu() {
     clear
     echo ""
     echo "  ============================================================"
-    echo "   ZKTeco Attendance Dashboard  v2.2"
+    echo "   ZKTeco Attendance Dashboard  v2.2  [$PLATFORM]"
     echo "  ============================================================"
     echo ""
     echo "    [1]  Open Dashboard   (start server)"
@@ -36,8 +81,12 @@ menu() {
     echo "    [7]  Scan MDB         (diagnostics)"
     echo "    [8]  Backup Database"
     echo "    [9]  Install/Update packages"
-    echo "    [S]  Install as systemd service (auto-start on boot)"
-    echo "    [X]  Remove systemd service"
+    if [ "$PLATFORM" = "linux" ]; then
+        echo "    [S]  Install as systemd service (auto-start on boot)"
+        echo "    [X]  Remove systemd service"
+    elif [ "$PLATFORM" = "termux" ]; then
+        echo "    [S]  Termux:Boot setup instructions"
+    fi
     echo "    [0]  Exit"
     echo ""
     read -rp "  Choice: " CHOICE
@@ -53,8 +102,8 @@ menu() {
         7) do_scan ;;
         8) do_backup ;;
         9) do_setup ;;
-        [Ss]) do_install_service ;;
-        [Xx]) do_remove_service ;;
+        [Ss]) do_service ;;
+        [Xx]) [ "$PLATFORM" = "linux" ] && do_remove_service || echo "  Not supported on $PLATFORM." ; sleep 1 ; menu ;;
         0) echo "  Goodbye."; exit 0 ;;
         *) echo "  Invalid choice." ; sleep 1 ; menu ;;
     esac
@@ -74,8 +123,8 @@ do_dashboard() {
     echo "  URL : http://localhost:5000/d"
     echo "  Keep this window open. Ctrl+C to stop."
     echo "  ============================================================"
-    # Open browser in background (best-effort — may not work on headless servers)
-    (sleep 3 && xdg-open "http://localhost:5000/d" 2>/dev/null || true) &
+    # Open browser in background (best-effort)
+    (sleep 3 && open_browser "http://localhost:5000/d") &
     $PYTHON server.py
     after_action
 }
@@ -146,10 +195,48 @@ do_backup() {
 do_setup() {
     echo "  Installing/updating packages..."
     echo ""
-    sudo apt-get install -y mdbtools --quiet
-    pip install --upgrade flask pandas openpyxl pyzk werkzeug --quiet
+    case "$PLATFORM" in
+        termux)
+            pkg install -y python mdbtools 2>/dev/null || true
+            pip install --upgrade flask pandas openpyxl pyzk werkzeug reportlab --quiet
+            ;;
+        macos)
+            if command -v brew &>/dev/null; then
+                brew install mdbtools 2>/dev/null || true
+            fi
+            pip3 install --upgrade flask pandas openpyxl pyzk werkzeug reportlab --quiet 2>/dev/null || \
+                pip install --upgrade flask pandas openpyxl pyzk werkzeug reportlab --quiet
+            ;;
+        *)
+            sudo apt-get install -y mdbtools --quiet
+            pip install --upgrade flask pandas openpyxl pyzk werkzeug --quiet
+            ;;
+    esac
     echo "  OK: packages updated"
     after_action
+}
+
+do_service() {
+    if [ "$PLATFORM" = "termux" ]; then
+        echo "  ── Termux:Boot Auto-Start Setup ──────────────────────────"
+        echo ""
+        echo "  1. Install the 'Termux:Boot' app from F-Droid or Play Store."
+        echo "  2. Open Termux:Boot once to grant permissions."
+        echo "  3. Create the boot script:"
+        echo ""
+        echo "       mkdir -p ~/.termux/boot"
+        echo "       cat > ~/.termux/boot/start-attendance.sh << 'EOF'"
+        echo "       #!/data/data/com.termux/files/usr/bin/bash"
+        echo "       cd $SCRIPT_DIR"
+        echo "       $PYTHON server.py &"
+        echo "       EOF"
+        echo "       chmod +x ~/.termux/boot/start-attendance.sh"
+        echo ""
+        echo "  The dashboard will start automatically after each Android reboot."
+        after_action
+        return
+    fi
+    do_install_service
 }
 
 do_install_service() {

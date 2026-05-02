@@ -48,6 +48,34 @@ bash install.sh       # installs packages, exports employees, syncs devices
 bash attendance.sh    # interactive menu
 ```
 
+### macOS
+
+```bash
+brew install mdbtools   # for MDB file reading (optional)
+bash install.sh         # installs remaining packages
+bash attendance.sh      # interactive menu
+```
+
+### Android (Termux)
+
+```bash
+pkg install python sqlite mdbtools   # system packages
+bash install.sh                      # installs Python packages
+bash attendance.sh                   # interactive menu
+```
+
+**Auto-start on Android boot (Termux:Boot):**
+1. Install the [Termux:Boot](https://wiki.termux.com/wiki/Termux:Boot) add-on.
+2. Open Termux:Boot once to grant permissions.
+3. Create the boot script:
+   ```bash
+   mkdir -p ~/.termux/boot
+   echo '#!/data/data/com.termux/files/usr/bin/bash
+   cd /path/to/ZKTeco
+   python server.py &' > ~/.termux/boot/start-attendance.sh
+   chmod +x ~/.termux/boot/start-attendance.sh
+   ```
+
 ### Windows
 
 ```bat
@@ -58,7 +86,7 @@ attendance.bat        # interactive menu
 
 ```bash
 python3 -m venv venv
-source venv/bin/activate        # Linux/macOS
+source venv/bin/activate        # Linux/macOS/Termux
 # venv\Scripts\activate         # Windows
 
 pip install -r requirements.txt
@@ -71,6 +99,20 @@ python server.py      # open http://localhost:5000
 ```
 
 ---
+
+## Platform Notes
+
+| Feature | Windows | Linux | macOS | Android (Termux) |
+|---------|---------|-------|-------|-----------------|
+| Dashboard (`server.py`) | ✅ | ✅ | ✅ | ✅ |
+| Device sync (`sync_db.py`) | ✅ | ✅ | ✅ | ✅ |
+| MDB import | ✅ pyodbc | ✅ mdbtools | ✅ mdbtools | ✅ mdbtools |
+| Real-time logger (`main.py`) | ✅ | ✅ | ✅ | ✅ |
+| Auto-start | Task Scheduler / bat | systemd | launchd | Termux:Boot |
+
+MDB features (employee export, absent reports from Access backup) require:
+- **Windows**: Microsoft Access Database Engine (pyodbc)
+- **Linux/macOS/Termux**: `mdbtools` (`sudo apt install mdbtools` / `brew install mdbtools` / `pkg install mdbtools`)
 
 ## Configuration
 
