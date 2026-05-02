@@ -2534,7 +2534,12 @@ window._doSendZkSection = function(section) {
   const iframe = document.getElementById('zkMainFrame');
   if (!iframe) return;
   if (window._zkFrameReady) {
-    try { iframe.contentWindow.postMessage({ zkAction: 'showSection', section }, '*'); } catch(e) {}
+    try {
+      // Use same-origin target to prevent message leaking to unexpected frames
+      iframe.contentWindow.postMessage({ zkAction: 'showSection', section }, window.location.origin);
+    } catch(e) {
+      console.warn('[ZK] postMessage failed:', e.message);
+    }
   } else {
     window._zkPendingSection = section;
   }

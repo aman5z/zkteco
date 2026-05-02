@@ -1732,7 +1732,9 @@ function onLoginSuccess(user){
     document.getElementById('hist-from').value=today;
     const tabParam=new URLSearchParams(window.location.search).get('tab');
     if(tabParam){const btn=document.querySelector(`[data-sec="${tabParam}"]`);if(btn)btn.click();}
-    // If loaded embedded with a specific section, navigate there
+    // If loaded embedded with a specific section, navigate there.
+    // 150 ms delay gives the overview fetch that runs above time to start without
+    // blocking the initial render before switching to the requested section.
     if(window._zkStartSection){
       const _sec=window._zkStartSection; window._zkStartSection=null;
       setTimeout(()=>{ const btn=document.querySelector('[data-sec="'+_sec+'"]'); if(btn)btn.click(); else showSection(_sec,null); },150);
