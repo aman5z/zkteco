@@ -70,8 +70,9 @@ bash attendance.sh                   # interactive menu
 3. Create the boot script:
    ```bash
    mkdir -p ~/.termux/boot
+   # Replace ~/ZKTeco with the actual path to your ZKTeco folder
    echo '#!/data/data/com.termux/files/usr/bin/bash
-   cd /path/to/ZKTeco
+   cd ~/ZKTeco
    python server.py &' > ~/.termux/boot/start-attendance.sh
    chmod +x ~/.termux/boot/start-attendance.sh
    ```

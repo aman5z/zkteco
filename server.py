@@ -1520,7 +1520,7 @@ class _MdbToolsConn:
         if r.returncode != 0:
             if sys.platform == "darwin":
                 hint = "Install with: brew install mdbtools"
-            elif "com.termux" in os.environ.get("PREFIX", ""):
+            elif os.environ.get("TERMUX_VERSION") or "com.termux" in os.environ.get("PREFIX", ""):
                 hint = "Install with: pkg install mdbtools"
             else:
                 hint = "Install with: sudo apt install mdbtools"

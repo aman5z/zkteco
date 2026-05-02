@@ -504,7 +504,8 @@ class _MdbToolsConn:
         self._tables = [t.strip() for t in r.stdout.splitlines() if t.strip()]
 
     def read_table(self, table_name):
-        import subprocess, io
+        import subprocess
+        import io
         import pandas as pd
         r = subprocess.run(["mdb-export", self.mdb_path, table_name],
                            capture_output=True, text=True, timeout=60)

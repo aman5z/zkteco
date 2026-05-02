@@ -126,7 +126,7 @@ class _MdbToolsConn:
         if r.returncode != 0:
             if sys.platform == "darwin":
                 hint = "brew install mdbtools"
-            elif "com.termux" in os.environ.get("PREFIX", ""):
+            elif os.environ.get("TERMUX_VERSION") or "com.termux" in os.environ.get("PREFIX", ""):
                 hint = "pkg install mdbtools"
             else:
                 hint = "sudo apt install mdbtools"
@@ -136,7 +136,8 @@ class _MdbToolsConn:
         self._tables = [t.strip() for t in r.stdout.splitlines() if t.strip()]
 
     def read_table(self, table_name):
-        import subprocess, io
+        import subprocess
+        import io
         import pandas as pd
         r = subprocess.run(["mdb-export", self.mdb_path, table_name],
                            capture_output=True, text=True, timeout=60)
