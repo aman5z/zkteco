@@ -701,8 +701,9 @@ def _init_telegram():
     global _tg_notifier, _tg_init_error
     try:
         from telegram_notifier import TelegramNotifier
-        token   = _cfg('telegram', 'bot_token',   '') or db_manager.get_setting('tg_bot_token',   '')
-        chat_id = _cfg('telegram', 'chat_id',     '') or db_manager.get_setting('tg_chat_id',     '')
+        # Prefer DB (saved via Admin UI) over settings.ini default
+        token   = db_manager.get_setting('tg_bot_token', '') or _cfg('telegram', 'bot_token',   '')
+        chat_id = db_manager.get_setting('tg_chat_id',   '') or _cfg('telegram', 'chat_id',     '')
         if not token or not chat_id:
             missing = ("bot_token, " if not token else "") + ("chat_id" if not chat_id else "")
             print("[Telegram] No token/chat_id configured — notifications disabled"); sys.stdout.flush()
