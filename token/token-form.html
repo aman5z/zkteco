@@ -352,9 +352,9 @@
   }
 
   // ── MAIN SUBMIT ──
-  // Uses no-cors fetch POST → GAS writes the row and returns token in response.
-  // no-cors means we can't read the response body, so we POST then poll getQueue
-  // via a second POST (not GET) which avoids the redirect CORS issue entirely.
+  // Uses GET requests to GAS — GAS handles CORS correctly for GET on /exec URLs.
+  // POST to /exec triggers a 302 redirect that strips the body, so GET with
+  // query params is the reliable cross-origin approach.
   async function submitToken() {
     if (!validate()) return;
 
@@ -367,38 +367,29 @@
     const dept       = document.getElementById('dept').value;
     const reason     = selectedReason || document.getElementById('reasonText').value.trim();
 
-    // ── Step 1: Issue token via POST (mode:cors — GAS supports it) ──
+    // ── Step 1: Issue token via GET ──
     let token    = null;
     let position = 1;
 
     try {
-      const res  = await fetch(GAS_URL, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body:    new URLSearchParams({ action:'issueToken', admNo, parentName, dept, reason }),
-        redirect: 'follow'
-      });
-      const data = await res.json();
+      const params = new URLSearchParams({ action:'issueToken', admNo, parentName, dept, reason });
+      const res    = await fetch(GAS_URL + '?' + params.toString());
+      const data   = await res.json();
       if (data && data.token) {
         token = data.token;
       }
     } catch(err) {
-      console.warn('Direct POST failed, falling back to poll:', err);
+      console.warn('issueToken GET failed:', err);
     }
 
-    // ── Step 2: If direct POST didn't return token, poll getQueue via POST ──
+    // ── Step 2: If step 1 didn't return token, poll getQueue via GET ──
     if (!token) {
-      const now = Date.now();
       for (let attempt = 0; attempt < 20; attempt++) {
         await sleep(1000);
         try {
-          const res  = await fetch(GAS_URL, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body:    new URLSearchParams({ action:'getQueue', dept }),
-            redirect: 'follow'
-          });
-          const rows = await res.json();
+          const params = new URLSearchParams({ action:'getQueue', dept });
+          const res    = await fetch(GAS_URL + '?' + params.toString());
+          const rows   = await res.json();
           if (Array.isArray(rows)) {
             const today = new Date().toISOString().slice(0, 10);
             const myRow = rows.find(r => {
@@ -421,15 +412,11 @@
       return;
     }
 
-    // ── Step 3: Get queue position via POST ──
+    // ── Step 3: Get queue position via GET ──
     try {
-      const res  = await fetch(GAS_URL, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body:    new URLSearchParams({ action:'getQueue', dept }),
-        redirect: 'follow'
-      });
-      const rows = await res.json();
+      const params = new URLSearchParams({ action:'getQueue', dept });
+      const res    = await fetch(GAS_URL + '?' + params.toString());
+      const rows   = await res.json();
       if (Array.isArray(rows)) {
         const today   = new Date().toISOString().slice(0, 10);
         const waiting = rows.filter(r =>
