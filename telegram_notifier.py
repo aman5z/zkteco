@@ -308,7 +308,7 @@ class TelegramBotHandler:
       device sync     — sync time & users across all devices
       device reboot   — present inline keyboard to pick a device (or all)
       user search     — prompt for employee name/badge and show punch timings today
-      user <name/id>  — directly look up employee by name or badge (e.g. "user 1024", "user john")
+      user <name/badge>  — directly look up employee by name or badge (e.g. "user 1024", "user john")
       today summary   — present/absent/total counts and cache age
       today absent    — full absent list grouped by department
       dept summary    — per-department present vs absent breakdown
