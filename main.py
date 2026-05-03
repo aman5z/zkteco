@@ -124,12 +124,18 @@ def wait_for_network(max_wait_s=120):
             time.sleep(3)
     return False
 
+def _ping_cmd(host):
+    """Return a cross-platform ping command list for a single-packet ping."""
+    if sys.platform.startswith("win"):
+        return ["ping", "-n", "1", "-w", "1000", host]
+    return ["ping", "-c", "1", "-W", "1", host]
+
 def any_device_ping_ok(hosts, max_wait_s=60):
     start = time.time()
     while time.time() - start < max_wait_s:
         for h in hosts:
             try:
-                rc = subprocess.call(["ping", "-c", "1", "-W", "1", h],
+                rc = subprocess.call(_ping_cmd(h),
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if rc == 0:
                     return True

@@ -1507,19 +1507,25 @@ def _find_mdb():
     )
 
 def _is_linux():
-    return sys.platform.startswith("linux")
+    """Return True on Linux/macOS/Android — any platform where mdbtools is available instead of pyodbc."""
+    return not sys.platform.startswith("win")
 
 class _MdbToolsConn:
-    """Minimal MDB connection using mdbtools on Linux."""
+    """Minimal MDB connection using mdbtools on Linux/macOS/Android."""
     def __init__(self, mdb_path):
         import subprocess
         self.mdb_path = mdb_path
         r = subprocess.run(["mdb-tables", "-1", mdb_path],
                            capture_output=True, text=True, timeout=10)
         if r.returncode != 0:
+            if sys.platform == "darwin":
+                hint = "Install with: brew install mdbtools"
+            elif os.environ.get("TERMUX_VERSION") or "com.termux" in os.environ.get("PREFIX", ""):
+                hint = "Install with: pkg install mdbtools"
+            else:
+                hint = "Install with: sudo apt install mdbtools"
             raise RuntimeError(
-                "mdbtools error: " + r.stderr.strip() + "\n"
-                "Install with: sudo apt install mdbtools"
+                "mdbtools error: " + r.stderr.strip() + "\n" + hint
             )
         self._tables = [t.strip() for t in r.stdout.splitlines() if t.strip()]
 
@@ -1574,7 +1580,7 @@ def connect_mdb(mdb_path=None):
     if not os.path.exists(path):
         raise FileNotFoundError("MDB not found: " + path)
     if _is_linux():
-        print("[MDB] Linux — using mdbtools"); sys.stdout.flush()
+        print("[MDB] non-Windows — using mdbtools"); sys.stdout.flush()
         return _MdbToolsConn(path)
     import pyodbc
     return pyodbc.connect(
