@@ -60,7 +60,6 @@ body{
   position:sticky;
   top:0;
   z-index:100;
-  position:relative;
 }
 #clock{
   font-size:15px;
@@ -362,7 +361,7 @@ function login(){
     password:document.getElementById("password").value
   }, function(d){
     hideSpinner();
-    if(d && d.success){
+    if(d && d.token){
       const remember = document.getElementById("rememberMe").checked;
       if(remember){
         localStorage.setItem("token", d.token);
