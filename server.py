@@ -896,6 +896,103 @@ def _bot_search_employee(query: str) -> str:
     return "\n".join(lines)
 
 
+def _bot_get_db_stats() -> dict:
+    """Return database statistics for the bot."""
+    try:
+        return get_db_stats()
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+def _bot_get_unknown_users() -> list:
+    """Return unresolved unknown users seen on devices."""
+    try:
+        return get_unknown_users()
+    except Exception:
+        return []
+
+
+def _bot_get_upcoming_holidays() -> list:
+    """Return holidays within the next 30 days (including today)."""
+    from datetime import timedelta
+    today  = date.today()
+    cutoff = today + timedelta(days=30)
+    result = []
+    try:
+        for yr in sorted({today.year, cutoff.year}):
+            for r in (get_holidays(year=yr) or []):
+                try:
+                    d = datetime.strptime(r["date"], "%Y-%m-%d").date()
+                except Exception:
+                    continue
+                if today <= d <= cutoff:
+                    result.append(r)
+    except Exception:
+        pass
+    result.sort(key=lambda r: r.get("date", ""))
+    return result
+
+
+def _bot_get_pending_punches() -> list:
+    """Return pending punch-correction requests awaiting admin approval."""
+    try:
+        return rp_get_pending_approvals()
+    except Exception:
+        return []
+
+
+def _bot_trigger_cache_refresh() -> bool:
+    """Kick off a background cache refresh; return True if thread started."""
+    try:
+        t = threading.Thread(target=_refresh_cache)
+        t.daemon = True
+        t.start()
+        return True
+    except Exception:
+        return False
+
+
+def _bot_get_employee_punches_today(query: str) -> str:
+    """Look up employee by name/badge and return their punch times for today, formatted HTML."""
+    q     = query.strip().lower()
+    emps  = get_employees(active_only=False)
+    matched = None
+    for emp in emps:
+        badge = str(emp.get("badge", "")).strip()
+        name  = str(emp.get("name",  "")).strip()
+        if q == badge.lower() or q in name.lower():
+            matched = emp
+            break
+    if not matched:
+        return "🔍 No employee found matching <b>{0}</b>".format(query)
+
+    badge    = matched["badge"]
+    emp_name = matched["name"]
+    emp_dept = matched.get("dept", "")
+    today    = date.today()
+    records  = get_punch_records_for_employee(badge, today, today)
+
+    lines = [
+        "👤 <b>{name}</b> ({badge}) — {dept}".format(
+            name=emp_name, badge=badge, dept=emp_dept),
+        "📅 <b>{0}</b>".format(today.strftime("%d %b %Y")),
+        "",
+    ]
+    if not records:
+        lines.append("❌ No punches recorded today.")
+    else:
+        lines.append("✅ <b>{0} punch(es) today:</b>".format(len(records)))
+        for r in records:
+            t_str = r.get("punch_time", "")
+            try:
+                t_str = datetime.strptime(t_str, "%Y-%m-%d %H:%M:%S").strftime("%I:%M:%S %p")
+            except Exception:
+                pass
+            lines.append("  🕐 {0}  (<code>{1}</code>)".format(
+                t_str, r.get("device_ip", "?")))
+    return "\n".join(lines)
+
+
 def _init_telegram():
     """Instantiate TelegramNotifier and TelegramBotHandler from settings.ini / DB overrides."""
     global _tg_notifier, _tg_bot_handler, _tg_init_error
@@ -943,6 +1040,12 @@ def _init_telegram():
             sync_users_fn=_bot_sync_users,
             reboot_device_fn=_bot_reboot_device,
             search_employee_fn=_bot_search_employee,
+            get_db_stats_fn=_bot_get_db_stats,
+            get_unknown_users_fn=_bot_get_unknown_users,
+            get_upcoming_holidays_fn=_bot_get_upcoming_holidays,
+            get_pending_punches_fn=_bot_get_pending_punches,
+            cache_refresh_fn=_bot_trigger_cache_refresh,
+            get_employee_punches_fn=_bot_get_employee_punches_today,
         )
         _tg_bot_handler.start()
         _tg_init_error = None
