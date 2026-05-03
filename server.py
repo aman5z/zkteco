@@ -897,15 +897,16 @@ def _bot_search_employee(query: str) -> str:
                     pass
                 lines.append("   🕐 {0}".format(t_str))
         else:
-            lines.append("   🕐 Punched today (no detailed records)")
+            lines.append("   ⚠️ Marked present but no punch records found")
         lines.append("")
 
     for emp in hits_absent:
         badge = emp.get("code", "")
         name  = emp.get("name", "")
         dept  = emp.get("dept", "")
-        lines.append("❌ <b>{name}</b> ({badge}) — {dept}\n   Not punched today\n".format(
+        lines.append("❌ <b>{name}</b> ({badge}) — {dept}\n   Not punched today".format(
             name=name, badge=badge, dept=dept))
+        lines.append("")
 
     return "\n".join(lines).rstrip()
 
