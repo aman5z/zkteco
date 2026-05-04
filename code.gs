@@ -41,7 +41,20 @@ function doPost(e) {
   if (a==="terminal")          return terminalCommand(e);
   return j("Invalid action");
 }
-function doGet() { return j("System Online — aman5z.in"); }
+function doGet(e) {
+  if (!e || !e.parameter) return j("System Online — aman5z.in");
+  const a = e.parameter.action;
+  const cb = e.parameter.callback;
+  if (a === "issueToken")       return wrapJsonp(issueToken(e),       cb);
+  if (a === "getQueue")         return wrapJsonp(getQueue(e),         cb);
+  if (a === "getCountersPublic") return wrapJsonp(getCountersPublic(), cb);
+  return j("System Online — aman5z.in");
+}
+function wrapJsonp(output, cb) {
+  if (!cb) return output;
+  const text = output.getContent();
+  return ContentService.createTextOutput(cb + "(" + text + ")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
 
 /* ── LOGIN ──
    Users cols: 0=Email 1=Hash 2=Role 3=Phone 4=DisplayName 5=Dept 6=Enabled 7=Modified 8=LastLogon 9=Permissions */
@@ -291,6 +304,71 @@ function logCH(id,name,val,user,action) {
   try { const s=ss().getSheetByName("CounterHistory"); if(s) s.appendRow([id,name,val,user,action,new Date()]); } catch(err) {}
 }
 
+/* ── PUBLIC TOKEN QUEUE ── */
+// Sheet cols: [0=Token, 1=Dept, 2=AdmNo, 3=ParentName, 4=Reason, 5=CounterAssigned, 6=ServedBy, 7=Status, 8=IssuedAt]
+function ensureTokenQueueSheet() {
+  const wb = ss();
+  if (!wb.getSheetByName("TokenQueue")) {
+    const s = wb.insertSheet("TokenQueue");
+    s.appendRow(["Token","Dept","AdmNo","ParentName","Reason","CounterAssigned","ServedBy","Status","IssuedAt"]);
+  }
+}
+
+function issueToken(e) {
+  try {
+    ensureTokenQueueSheet();
+    const dept       = (e.parameter.dept       || "").toUpperCase().trim();
+    const admNo      = (e.parameter.admNo      || "").trim();
+    const parentName = (e.parameter.parentName || "").trim();
+    const reason     = (e.parameter.reason     || "").trim();
+    if (!dept || !parentName) return j({error:"Missing required fields"});
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const sheet = ss().getSheetByName("TokenQueue");
+      const data  = sheet.getDataRange().getValues();
+      const today = dateStr(new Date());
+      let deptCount = 0;
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][1]).toUpperCase() === dept && dateStr(data[i][8]) === today) deptCount++;
+      }
+      const token = dept + "-" + String(deptCount + 1).padStart(2, "0");
+      sheet.appendRow([token, dept, admNo, parentName, reason, "", "", "WAITING", new Date().toISOString()]);
+      return j({token: token});
+    } finally {
+      lock.releaseLock();
+    }
+  } catch(err) {
+    return j({error: err.message});
+  }
+}
+
+function getQueue(e) {
+  try {
+    ensureTokenQueueSheet();
+    const dept  = (e.parameter.dept || "").toUpperCase().trim();
+    const data  = ss().getSheetByName("TokenQueue").getDataRange().getValues();
+    const today = dateStr(new Date());
+    const rows  = data.slice(1).filter(r => (!dept || String(r[1]).toUpperCase() === dept) && dateStr(r[8]) === today);
+    return j(rows);
+  } catch(err) {
+    return j({error: err.message});
+  }
+}
+
+function getCountersPublic() {
+  try {
+    ensureCountersSheet();
+    const data = ss().getSheetByName("Counters").getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (!data[i][4]) { const p = String.fromCharCode(64+i); data[i][4] = p; }
+    }
+    return j(data);
+  } catch(err) {
+    return j({error: err.message});
+  }
+}
+
 /* ── TICKETS ── */
 function getTickets(e) {
   const u = authAny(e); if (!u) return j("Unauthorized");
@@ -443,6 +521,7 @@ function sendWelcomeEmail(email,displayName,role,tempPass){
 /* ── HELPERS ── */
 function ss(){return SpreadsheetApp.openById(SHEET_ID);}
 function j(v){return ContentService.createTextOutput(JSON.stringify(v)).setMimeType(ContentService.MimeType.JSON);}
+function dateStr(v){const d=v instanceof Date?v:new Date(v);return isNaN(d.getTime())?"":[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");}
 function hash(pw){const raw=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,pw);return raw.map(b=>(b<0?b+256:b).toString(16).padStart(2,"0")).join("");}
 function auth(e,role){const s=CacheService.getScriptCache().get(e.parameter.token||"");if(!s)return null;try{const p=JSON.parse(s);if(new Date()>new Date(p.expiry))return null;if(role&&p.role!==role)return null;return p;}catch(err){return null;}}
 function authAny(e){const s=CacheService.getScriptCache().get(e.parameter.token||"");if(!s)return null;try{const p=JSON.parse(s);if(new Date()>new Date(p.expiry))return null;return p;}catch(err){return null;}}
