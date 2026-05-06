@@ -1704,7 +1704,10 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
           <div class="card" style="flex:1;display:flex;flex-direction:column;" id="chatViewArea">
             <div class="card-header" style="border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
                <h3 id="chatPeerName">Select a conversation</h3>
-               <span id="chatPeerStatus" class="tag tag-off" style="display:none">Offline</span>
+               <div style="display:flex;gap:6px;align-items:center">
+                 <span id="chatPeerStatus" class="tag tag-off" style="display:none">Offline</span>
+                 <button id="chatCallBtn" class="btn btn-secondary btn-sm" onclick="voipCallFromChat()" style="display:none" title="Voice call">📞 Call</button>
+               </div>
             </div>
             <div id="messagesBody" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px">
                <div class="empty-state" style="margin:auto">No chat selected</div>
@@ -1873,18 +1876,12 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
               <div class="form-group"><label>Session Timeout (minutes, 0=disabled)</label><input class="form-control" id="sSessionTimeout" type="number" value="60"></div>
             </div>
             <div class="settings-section">
-              <h3>📞 VoIP / Asterisk Settings</h3>
-              <p style="font-size:11px;color:var(--text2);margin-bottom:10px">Configure your Asterisk PBX WebSocket endpoint. Asterisk must have the <code style="background:var(--card2);padding:1px 4px;border-radius:3px">res_http_websocket</code> and <code style="background:var(--card2);padding:1px 4px;border-radius:3px">chan_pjsip</code> modules enabled. Point the WebSocket URL to <code style="background:var(--card2);padding:1px 4px;border-radius:3px">wss://your-pbx:8089/ws</code>. Verify modules with <code style="background:var(--card2);padding:1px 4px;border-radius:3px">asterisk -rx "module show like websocket"</code> on the server. See <a href="https://docs.asterisk.org/Configuration/WebRTC/" target="_blank" style="color:var(--accent)">Asterisk WebRTC docs</a> for full setup.</p>
-              <div class="form-group"><label>Asterisk WebSocket URL</label><input class="form-control" id="sVoipWs" placeholder="wss://pbx.company.com:8089/ws"></div>
-              <div class="form-row">
-                <div class="form-group"><label>SIP Extension</label><input class="form-control" id="sVoipExt" placeholder="1001"></div>
-                <div class="form-group"><label>Realm / Domain</label><input class="form-control" id="sVoipRealm" placeholder="pbx.company.com"></div>
-              </div>
-              <div class="form-group"><label>SIP Password</label><input class="form-control" type="password" id="sVoipPass" placeholder="Extension SIP password" autocomplete="new-password"></div>
-              <div class="form-group"><label>Display Name (shown to callee)</label><input class="form-control" id="sVoipDisplayName" placeholder="e.g. Admin User"></div>
+              <h3>📞 VoIP Calling</h3>
+              <p style="font-size:11px;color:var(--text2);margin-bottom:10px">Employee-to-employee WebRTC calls work out-of-the-box — no external PBX or SIP server needed. VoIP uses the same identity as messaging (badge / username). The only server-side requirement is <code style="background:var(--card2);padding:1px 4px;border-radius:3px">flask-socketio</code> in your Python environment.</p>
+              <div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:12px;font-family:var(--mono);font-size:12px;margin-bottom:12px">pip install flask-socketio<br>python server.py</div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn btn-primary btn-sm" onclick="saveVoipSettings()">💾 Save VoIP Config</button>
-                <button class="btn btn-secondary btn-sm" onclick="voipConnect()">🔗 Connect Now</button>
+                <span id="voipRegStatus2" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:99px;background:var(--card2);border:1px solid var(--border2);color:var(--text2)">● —</span>
+                <button class="btn btn-secondary btn-sm" onclick="voipInit()">🔗 Reconnect</button>
                 <span id="voipSaveResult" style="font-size:11px;font-family:var(--mono)"></span>
               </div>
             </div>
@@ -2258,11 +2255,10 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
         <div class="page-hdr">
           <div class="page-hdr-left">
             <h2>VoIP Calls</h2>
-            <p class="text-mono">Asterisk / SIP WebRTC calling</p>
+            <p class="text-mono">Employee-to-employee voice calls (WebRTC — no external PBX needed)</p>
           </div>
           <div class="page-actions" style="gap:10px;align-items:center">
-            <span id="voipRegStatus" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:99px;background:var(--card2);border:1px solid var(--border2);color:var(--text2)">● Disconnected</span>
-            <button class="btn btn-secondary btn-sm" onclick="voipConnect()">Connect</button>
+            <span id="voipRegStatus" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:99px;background:var(--card2);border:1px solid var(--border2);color:var(--text2)">● Connecting…</span>
             <button class="btn btn-secondary btn-sm" onclick="voipDisconnect()">Disconnect</button>
           </div>
         </div>
@@ -2278,7 +2274,7 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
               <div id="voipContactList" style="display:flex;flex-direction:column;gap:4px"></div>
             </div>
             <div style="padding:12px;border-top:1px solid var(--border);flex-shrink:0">
-              <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.6px">Direct Dial</div>
+              <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.6px">Direct Dial (badge / username)</div>
               <div style="display:flex;gap:6px">
                 <input type="text" class="form-control" id="voipDirectDial" placeholder="Extension or number" style="flex:1;font-size:13px" onkeypress="if(event.key==='Enter')voipDirectCall()">
                 <button class="btn btn-primary btn-sm" onclick="voipDirectCall()" title="Call">📞</button>
@@ -2604,7 +2600,7 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
 <script src="js/ittools.js"></script>
 <script src="js/init.js"></script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jssip/3.10.0/jssip.min.js" integrity="sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb" crossorigin="anonymous"></script>
+<script src="/socket.io/socket.io.js"></script>
 <script src="js/voip.js"></script>
 
 <script>
