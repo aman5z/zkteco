@@ -81,6 +81,10 @@ function openChat(peer) {
    el('chatPeerStatus').textContent = isOnline?'Online':'Offline';
    el('chatInputArea').style.display = 'flex';   // was always hidden due to duplicate display:none
 
+   // Show call button
+   const callBtn = document.getElementById('chatCallBtn');
+   if(callBtn) callBtn.style.display = 'inline-flex';
+
    // Use username as identity — matches what server stores
    const me = STATE.user.username || STATE.user.badge;
    const pMsgs = ALL_MESSAGES.filter(m =>

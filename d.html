@@ -1176,9 +1176,27 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
         <span class="sb-icon">⚙</span> Admin
       </div>
 
-      <div class="sb-section">External</div>
-      <div class="sb-item" onclick="window.open('/ad','_blank')">
-        <span class="sb-icon">🏢</span> AD Console
+      <div class="sb-section">AD Management</div>
+      <div class="sb-item" onclick="showADSection('users')" id="sb-ad-users" data-adsec="users">
+        <span class="sb-icon">👥</span> AD Users
+      </div>
+      <div class="sb-item" onclick="showADSection('dash')" id="sb-ad-dash" data-adsec="dash">
+        <span class="sb-icon">📊</span> AD Dashboard
+      </div>
+      <div class="sb-item" onclick="showADSection('audit')" id="sb-ad-audit" data-adsec="audit">
+        <span class="sb-icon">📋</span> AD Audit Log
+      </div>
+      <div class="sb-item" onclick="showADSection('drive')" id="sb-ad-drive" data-adsec="drive">
+        <span class="sb-icon">🖴</span> AD Drive
+      </div>
+      <div class="sb-item" onclick="showADSection('tokens')" id="sb-ad-tokens" data-adsec="tokens">
+        <span class="sb-icon">🔢</span> AD Tokens
+      </div>
+      <div class="sb-item" onclick="showADSection('tickets')" id="sb-ad-tickets" data-adsec="tickets">
+        <span class="sb-icon">🎫</span> AD Tickets
+      </div>
+      <div class="sb-item" onclick="showADSection('tools')" id="sb-ad-tools" data-adsec="tools">
+        <span class="sb-icon">🧰</span> AD Tools
       </div>
     </div>
 
@@ -1686,7 +1704,10 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
           <div class="card" style="flex:1;display:flex;flex-direction:column;" id="chatViewArea">
             <div class="card-header" style="border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
                <h3 id="chatPeerName">Select a conversation</h3>
-               <span id="chatPeerStatus" class="tag tag-off" style="display:none">Offline</span>
+               <div style="display:flex;gap:6px;align-items:center">
+                 <span id="chatPeerStatus" class="tag tag-off" style="display:none">Offline</span>
+                 <button id="chatCallBtn" class="btn btn-secondary btn-sm" onclick="voipCallFromChat()" style="display:none" title="Voice call">📞 Call</button>
+               </div>
             </div>
             <div id="messagesBody" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px">
                <div class="empty-state" style="margin:auto">No chat selected</div>
@@ -1853,6 +1874,16 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
             <div class="settings-section">
               <h3>🔐 Security</h3>
               <div class="form-group"><label>Session Timeout (minutes, 0=disabled)</label><input class="form-control" id="sSessionTimeout" type="number" value="60"></div>
+            </div>
+            <div class="settings-section">
+              <h3>📞 VoIP Calling</h3>
+              <p style="font-size:11px;color:var(--text2);margin-bottom:10px">Employee-to-employee WebRTC calls work out-of-the-box — no external PBX or SIP server needed. VoIP uses the same identity as messaging (badge / username). The only server-side requirement is <code style="background:var(--card2);padding:1px 4px;border-radius:3px">flask-socketio</code> in your Python environment.</p>
+              <div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:12px;font-family:var(--mono);font-size:12px;margin-bottom:12px">pip install flask-socketio<br>python server.py</div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <span id="voipRegStatus2" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:99px;background:var(--card2);border:1px solid var(--border2);color:var(--text2)">● —</span>
+                <button class="btn btn-secondary btn-sm" onclick="voipInit()">🔗 Reconnect</button>
+                <span id="voipSaveResult" style="font-size:11px;font-family:var(--mono)"></span>
+              </div>
             </div>
           </div>
         </div>
@@ -2202,6 +2233,77 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
           onload="window._zkFrameReady=true;if(window._zkPendingSection){window._doSendZkSection(window._zkPendingSection);window._zkPendingSection=null;}"></iframe>
       </div>
 
+      <!-- ── AD MANAGEMENT (embedded iframe) ── -->
+      <div class="page" id="page-ad-main">
+        <div class="zk-subnav">
+          <button class="btn btn-secondary btn-sm" onclick="showADSection('users')"   id="adnav-users">👥 Users</button>
+          <button class="btn btn-secondary btn-sm" onclick="showADSection('dash')"    id="adnav-dash">📊 Dashboard</button>
+          <button class="btn btn-secondary btn-sm" onclick="showADSection('audit')"   id="adnav-audit">📋 Audit Log</button>
+          <button class="btn btn-secondary btn-sm" onclick="showADSection('drive')"   id="adnav-drive">🖴 Drive</button>
+          <button class="btn btn-secondary btn-sm" onclick="showADSection('tokens')"  id="adnav-tokens">🔢 Tokens</button>
+          <button class="btn btn-secondary btn-sm" onclick="showADSection('tickets')" id="adnav-tickets">🎫 Tickets</button>
+          <button class="btn btn-secondary btn-sm" onclick="showADSection('tools')"   id="adnav-tools">🧰 Tools</button>
+          <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="window.open('/ad','_blank')" title="Open in new tab">⧉</button>
+        </div>
+        <iframe id="adMainFrame" src="/ad"
+          style="flex:1;width:100%;border:none;display:block;min-height:0"
+          onload="window._adFrameReady=true;if(window._adPendingTab){window._doSendADTab(window._adPendingTab);window._adPendingTab=null;}"></iframe>
+      </div>
+
+      <!-- ── VOIP PAGE ── -->
+      <div class="page" id="page-voip">
+        <div class="page-hdr">
+          <div class="page-hdr-left">
+            <h2>VoIP Calls</h2>
+            <p class="text-mono">Employee-to-employee voice calls (WebRTC — no external PBX needed)</p>
+          </div>
+          <div class="page-actions" style="gap:10px;align-items:center">
+            <span id="voipRegStatus" style="font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:99px;background:var(--card2);border:1px solid var(--border2);color:var(--text2)">● Connecting…</span>
+            <button class="btn btn-secondary btn-sm" onclick="voipDisconnect()">Disconnect</button>
+          </div>
+        </div>
+        <div class="voip-layout">
+          <!-- Left: Directory + Dialpad -->
+          <div class="voip-panel">
+            <div class="voip-panel-hdr">
+              <span>📞</span> Directory
+              <button class="btn btn-secondary btn-sm" onclick="voipLoadContacts()" style="margin-left:auto">↻</button>
+            </div>
+            <div class="voip-panel-body">
+              <input type="text" id="voipSearchInput" class="form-control" placeholder="🔍 Search contacts…" oninput="voipFilterContacts()" style="margin-bottom:8px;font-size:12px">
+              <div id="voipContactList" style="display:flex;flex-direction:column;gap:4px"></div>
+            </div>
+            <div style="padding:12px;border-top:1px solid var(--border);flex-shrink:0">
+              <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.6px">Direct Dial (badge / username)</div>
+              <div style="display:flex;gap:6px">
+                <input type="text" class="form-control" id="voipDirectDial" placeholder="Extension or number" style="flex:1;font-size:13px" onkeypress="if(event.key==='Enter')voipDirectCall()">
+                <button class="btn btn-primary btn-sm" onclick="voipDirectCall()" title="Call">📞</button>
+              </div>
+            </div>
+          </div>
+          <!-- Right: Active Call + History -->
+          <div style="display:flex;flex-direction:column;gap:16px;min-height:0;overflow:hidden">
+            <!-- Active / Calling Panel -->
+            <div class="voip-panel" id="voipActivePanel" style="flex:0 0 auto">
+              <div class="voip-panel-hdr"><span>📱</span> Active Call</div>
+              <div class="voip-panel-body" id="voipActiveBody">
+                <div class="empty-state" style="padding:24px;text-align:center;color:var(--text2)">No active call</div>
+              </div>
+            </div>
+            <!-- Call History -->
+            <div class="voip-panel" style="flex:1;min-height:0">
+              <div class="voip-panel-hdr">
+                <span>📋</span> Call History
+                <button class="btn btn-secondary btn-sm" onclick="voipClearHistory()" style="margin-left:auto">Clear</button>
+              </div>
+              <div class="voip-panel-body" id="voipHistoryList">
+                <div class="empty-state" style="padding:24px;text-align:center;color:var(--text2)">No call history</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /main-content -->
   </div><!-- /app-body -->
 
@@ -2217,6 +2319,32 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
   </div>
 
 </div><!-- /appShell -->
+
+<!-- ── VOIP: Incoming Call Overlay ── -->
+<div id="voipIncomingOverlay">
+  <div class="voip-ring-card">
+    <div class="voip-ring-avatar" id="voipRingAvatar">?</div>
+    <div class="voip-ring-name" id="voipRingName">Unknown</div>
+    <div class="voip-ring-label" id="voipRingLabel">Incoming Call…</div>
+    <div class="voip-ring-btns">
+      <button class="voip-ring-btn voip-ring-accept" onclick="voipAnswerCall()" title="Answer">📞</button>
+      <button class="voip-ring-btn voip-ring-reject" onclick="voipRejectCall()" title="Reject">📵</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── VOIP: Active Call HUD (shown in header) ── -->
+<div id="voipHud">
+  <div class="voip-hud-info">
+    <div class="voip-hud-peer" id="voipHudPeer">—</div>
+    <div class="voip-hud-timer" id="voipHudTimer">00:00</div>
+    <div class="voip-hud-status" id="voipHudStatus">● Connected</div>
+  </div>
+  <div class="voip-hud-btns">
+    <button class="voip-hud-btn voip-btn-mute" id="voipMuteBtn" onclick="voipToggleMute()" title="Mute">🎙</button>
+    <button class="voip-hud-btn voip-btn-end" onclick="voipHangup()" title="Hang up">📵</button>
+  </div>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════════
      MODALS
@@ -2472,6 +2600,9 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
 <script src="js/ittools.js"></script>
 <script src="js/init.js"></script>
 
+<script src="/socket.io/socket.io.js"></script>
+<script src="js/voip.js"></script>
+
 <script>
 // ── ZK ATTENDANCE: section navigation via embedded iframe ─────────────────
 window._zkFrameReady   = false;
@@ -2508,6 +2639,52 @@ function showZkSection(section) {
 
   // Tell the iframe to show the right section
   window._doSendZkSection(section);
+}
+
+// ── AD MANAGEMENT: tab navigation via embedded iframe ─────────────────────
+window._adFrameReady  = false;
+window._adPendingTab  = null;
+
+window._doSendADTab = function(tab) {
+  var iframe = document.getElementById('adMainFrame');
+  if (!iframe) return;
+  if (window._adFrameReady) {
+    try {
+      iframe.contentWindow.postMessage({ adAction: 'showTab', tab: tab }, '*');
+    } catch(e) {
+      console.warn('[AD] postMessage failed:', e.message);
+    }
+  } else {
+    window._adPendingTab = tab;
+  }
+};
+
+// Listen for adReady signal from the ad.html iframe
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.adReady) {
+    window._adFrameReady = true;
+    if (window._adPendingTab) {
+      window._doSendADTab(window._adPendingTab);
+      window._adPendingTab = null;
+    }
+  }
+});
+
+function showADSection(tab) {
+  showPage('ad-main');
+
+  // Highlight sidebar items
+  document.querySelectorAll('[data-adsec]').forEach(function(el) { el.classList.remove('active'); });
+  var sb = document.getElementById('sb-ad-' + tab);
+  if (sb) sb.classList.add('active');
+
+  // Highlight in-page subnav button
+  document.querySelectorAll('#page-ad-main .zk-subnav .btn').forEach(function(b) { b.classList.remove('active'); });
+  var nb = document.getElementById('adnav-' + tab);
+  if (nb) nb.classList.add('active');
+
+  // Tell the iframe to switch tab
+  window._doSendADTab(tab);
 }
 
 /* ── MOBILE SIDEBAR TOGGLE ── */
