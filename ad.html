@@ -2372,6 +2372,8 @@ function toggleFullScreen(){
 function _adTryAutoLogin(email, password, apiOverride) {
   if (tok) return;           // already logged in
   if (!email || !password) return;
+  // Basic sanity check: require a non-empty email-like string
+  if (email.indexOf('@') < 1) return;
   if (apiOverride) API = apiOverride;
   if (!API) return;
   const emailEl = document.getElementById('lEmail');
