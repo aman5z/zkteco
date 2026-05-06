@@ -37,7 +37,14 @@ const VOIP_AUTO_CONNECT_DELAY_MS = 2500;
 // ============================================================
 
 function voipInit() {
-  if (_sio) return; // already connected
+  if (_sio && _sio.connected) return; // already connected
+
+  if (_sio) {
+    // Socket exists but is not connected (disconnected / errored).
+    // Clean it up so we can create a fresh connection below.
+    try { _sio.disconnect(); } catch(e) { console.warn('[VoIP] cleanup disconnect error:', e); }
+    _sio = null;
+  }
 
   // Check if Socket.IO client library is present
   if (typeof io === 'undefined') {
@@ -743,6 +750,13 @@ function _voipSetStatus(text, color) {
     e.style.color    = color || 'var(--text2)';
     e.style.borderColor = color || 'var(--border2)';
   });
+  // Keep the header disconnect/reconnect button in sync
+  var btn = document.getElementById('voipToggleBtn');
+  if (btn) {
+    var online = (text || '').indexOf('Online') !== -1;
+    btn.textContent  = online ? 'Disconnect' : '🔗 Connect';
+    btn.onclick      = online ? voipDisconnect : voipInit;
+  }
 }
 
 // ============================================================
