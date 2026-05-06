@@ -2657,9 +2657,22 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
 <script src="js/ittools.js"></script>
 <script src="js/init.js"></script>
 
-<script src="/socket.io/socket.io.js" onerror="(function(){var s=document.createElement('script');s.src='https://cdn.socket.io/4.7.5/socket.io.min.js';s.onload=function(){if(typeof voipInit==='function')setTimeout(voipInit,500);};document.head.appendChild(s);})()"></script>
+<!-- Fallback: load socket.io client from CDN if the server-side path fails to load
+     (happens when flask-socketio is not installed). The 500ms delay after load gives
+     voip.js time to finish its own DOMContentLoaded registration before we call voipInit. -->
+<script>
+function _loadSocketIOFallback() {
+  var s = document.createElement('script');
+  s.src = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
+  s.onload = function() {
+    // Allow voip.js DOMContentLoaded handler to run before retrying voipInit
+    if (typeof voipInit === 'function') setTimeout(voipInit, 500);
+  };
+  document.head.appendChild(s);
+}
+</script>
+<script src="/socket.io/socket.io.js" onerror="_loadSocketIOFallback()"></script>
 <script src="js/voip.js"></script>
-
 <script>
 // ── ZK ATTENDANCE: section navigation via embedded iframe ─────────────────
 window._zkFrameReady   = false;
