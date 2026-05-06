@@ -398,5 +398,5 @@ Don't have the backends set up yet? Click **"🎮 Enter Demo Mode"** on the logi
 
 ---
 
-**Author:** aman5z
+**Author:** Hashiq V H
 
