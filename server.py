@@ -671,6 +671,11 @@ DEPT_ORDER            = _cfg_list('departments', 'order',
 ADMIN_INACTIVITY_MINS    = _cfg_int('sessions', 'admin_inactivity_mins',    60)
 EMPLOYEE_INACTIVITY_MINS = _cfg_int('sessions', 'employee_inactivity_mins', 20)
 
+# ── VoIP / TURN config (optional — needed for WebRTC through NAT/cloudflared) ──
+VOIP_TURN_URL  = _cfg('voip', 'turn_url',  '')
+VOIP_TURN_USER = _cfg('voip', 'turn_user', '')
+VOIP_TURN_CRED = _cfg('voip', 'turn_cred', '')
+
 BACKUP_DIR = os.path.join(SCRIPT_DIR, 'backups')
 
 # Departments excluded from attendance tracking (absent/present reports)
@@ -1186,7 +1191,7 @@ app.secret_key = _get_or_create_secret_key()
 # ProxyFix: tells Flask the real scheme/host when behind nginx/caddy
 try:
     from werkzeug.middleware.proxy_fix import ProxyFix
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 except ImportError:
     pass
 
@@ -6024,7 +6029,18 @@ def voip_api_history():
 
 @app.route('/api/voip/status')
 def voip_api_status():
-    return jsonify({"enabled": SOCKETIO_AVAILABLE})
+    ice = [
+        {'urls': 'stun:stun.l.google.com:19302'},
+        {'urls': 'stun:stun1.l.google.com:19302'},
+    ]
+    if VOIP_TURN_URL:
+        entry = {'urls': VOIP_TURN_URL}
+        if VOIP_TURN_USER:
+            entry['username']   = VOIP_TURN_USER
+        if VOIP_TURN_CRED:
+            entry['credential'] = VOIP_TURN_CRED
+        ice.append(entry)
+    return jsonify({'enabled': SOCKETIO_AVAILABLE, 'ice_servers': ice})
 
 
 @app.route('/api/voip/directory')

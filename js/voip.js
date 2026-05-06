@@ -8,7 +8,8 @@
 'use strict';
 
 /* ── Constants ──────────────────────────────────────────────── */
-const VOIP_ICE_SERVERS = [
+// Populated from /api/voip/status on connect; fallback to Google STUN only
+var VOIP_ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' }
 ];
@@ -60,6 +61,9 @@ function voipInit() {
       _voipShowInstallHint();
       return;
     }
+    if (Array.isArray(d.ice_servers) && d.ice_servers.length) {
+      VOIP_ICE_SERVERS = d.ice_servers;
+    }
     _voipEnabled = true;
     _voipConnect();
   }).catch(function(){
@@ -79,7 +83,7 @@ function _voipConnect() {
 
   _voipSetStatus('◌ Connecting…', 'var(--yellow)');
 
-  _sio = io({ path: '/socket.io', transports: ['websocket', 'polling'] });
+  _sio = io({ path: '/socket.io', transports: ['polling', 'websocket'] });
 
   _sio.on('connect', function() {
     _voipSetStatus('◌ Registering…', 'var(--yellow)');
