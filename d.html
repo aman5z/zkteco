@@ -3754,7 +3754,7 @@ function showADSection(tab) {
   var sb = document.getElementById('sb-ad-' + tab);
   if (sb) sb.classList.add('active');
   // Switch tab in embedded ad content
-  if (typeof adSwitchTab === 'function') adSwitchTab(tab);
+  adSwitchTab(tab);
 }
 
 /* ── MOBILE SIDEBAR TOGGLE ── */
