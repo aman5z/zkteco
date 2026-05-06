@@ -20,7 +20,9 @@ async function loadDrive(folderId){
     const files=(d.files||[]).map(f=>{
       const icon=f.mimeType.includes('image')?'🖼':f.mimeType.includes('pdf')?'📄':f.mimeType.includes('sheet')?'📊':f.mimeType.includes('document')?'📝':'📎';
       const sz=f.size==null?'—':f.size>1048576?(f.size/1048576).toFixed(1)+' MB':f.size>1024?(f.size/1024).toFixed(0)+' KB':f.size+' B';
-      return `<div class="drive-item" data-url="${esc(f.url)}" ondblclick="if(this.dataset.url)window.open(this.dataset.url,'_blank')"><div class="icon">${icon}</div><div class="name">${esc(f.name)}</div><div class="size">${sz}</div></div>`;
+      // Validate URL scheme before storing to prevent javascript:/data: URI injection
+      const safeUrl=/^https?:\/\//i.test(f.url||'')?f.url:'';
+      return `<div class="drive-item" data-url="${esc(safeUrl)}" ondblclick="if(this.dataset.url)window.open(this.dataset.url,'_blank')"><div class="icon">${icon}</div><div class="name">${esc(f.name)}</div><div class="size">${sz}</div></div>`;
     });
     el('driveGrid').innerHTML=folders.concat(files).join('')||'<div class="empty-state"><div class="icon">📁</div><p>Empty folder</p></div>';
     el('drivePath').innerHTML='<span class="drive-path-seg" onclick="loadDrive()">🖴 Drive</span>'+(folderId?`<span class="drive-path-sep">/</span><span class="drive-path-seg">${esc(d.name||'Folder')}</span>`:'');

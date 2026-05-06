@@ -748,7 +748,10 @@ function applyPermissions(){
     el('sb-admin').style.display='none';
     if(!can('audit'))el('sb-audit').style.display='none';
     if(!can('storage'))el('sb-drive').style.display='none';
-    if(!can('users')){const sbEmp=el('sb-employees');if(sbEmp)sbEmp.style.display='none';}
+    if(!can('users')){
+      const sbEmp=el('sb-employees');
+      if(sbEmp)sbEmp.style.display='none';
+    }
     if(!can('tokens'))el('sb-counters').style.display='none';
     if(!can('tickets'))el('sb-tickets').style.display='none';
   }
