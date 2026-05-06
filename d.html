@@ -3857,7 +3857,7 @@ function adCloseMenus(){ document.querySelectorAll(".dropdown").forEach(d=>d.cla
 // ── SPINNER / TOAST ──
 function adSpin(on){ document.getElementById("ad-spinner").classList.toggle("show",on); }
 function adToast(msg, dur=2800){
-  const t=document.getElementById("adToast"); t.textContent=msg; t.classList.add("show");
+  const t=document.getElementById("ad-toast"); t.textContent=msg; t.classList.add("show");
   clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),dur);
 }
 
