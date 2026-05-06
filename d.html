@@ -2746,6 +2746,17 @@ window.addEventListener('message', function(e) {
       window._doSendADTab(window._adPendingTab);
       window._adPendingTab = null;
     }
+    // Send current GAS credentials to the iframe so it can auto-login without
+    // requiring the user to sign in a second time inside the AD console.
+    var iframe = document.getElementById('adMainFrame');
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage({
+        adAction  : 'adAuth',
+        api       : (typeof CFG !== 'undefined' ? CFG.gasUrl : '') || localStorage.getItem('gasUrl') || '',
+        email     : localStorage.getItem('gasEmail') || '',
+        password  : localStorage.getItem('gasPass')  || ''
+      }, window.location.origin);
+    }
   }
 });
 

@@ -1040,7 +1040,10 @@ td{padding:4px 10px;font-size:11px;border-right:1px solid var(--bdr);color:var(-
   </div>
 </div>
 <script>
-const API = "https://script.google.com/macros/s/AKfycbyxhqVi3BPh_ksWRJ5n9TWLGBK8HbEhxqqwqV4Bfft7VJJlGxRWI9PPS4Zhw_aKN1TOQQ/exec";
+// Use the GAS URL configured in the ERP console (shared localStorage), falling back to
+// the built-in deployment URL when running standalone without prior configuration.
+const _API_BUILTIN = "https://script.google.com/macros/s/AKfycbyxhqVi3BPh_ksWRJ5n9TWLGBK8HbEhxqqwqV4Bfft7VJJlGxRWI9PPS4Zhw_aKN1TOQQ/exec";
+let API = localStorage.getItem('gasUrl') || _API_BUILTIN;
 
 // Permission definitions
 const PERM_DEFS = [
@@ -2363,11 +2366,39 @@ function toggleFullScreen(){
   else document.exitFullscreen();
 }
 
+// ── AUTO-LOGIN from ERP console credentials (same-origin localStorage) ──────
+// When embedded inside d.html the user is already authenticated; use the GAS
+// credentials that d.html stored in localStorage so no second login is needed.
+function _adTryAutoLogin(email, password, apiOverride) {
+  if (tok) return;           // already logged in
+  if (!email || !password) return;
+  if (apiOverride) API = apiOverride;
+  if (!API) return;
+  const emailEl = document.getElementById('lEmail');
+  const passEl  = document.getElementById('lPass');
+  if (emailEl) emailEl.value = email;
+  if (passEl)  passEl.value  = password;
+  doLogin();
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+  const em = localStorage.getItem('gasEmail') || '';
+  const pw = localStorage.getItem('gasPass')  || '';
+  const url = localStorage.getItem('gasUrl')  || '';
+  if (url) API = url;           // refresh in case it changed after script init
+  _adTryAutoLogin(em, pw);
+});
+
 // ── EMBEDDED MODE (postMessage from parent d.html) ──
 window.addEventListener('message', function(e) {
-  if (!e.data || e.data.adAction !== 'showTab') return;
-  const tab = e.data.tab;
-  if (tab) switchTab(tab);
+  if (!e.data) return;
+  if (e.data.adAction === 'showTab') {
+    const tab = e.data.tab;
+    if (tab) switchTab(tab);
+  } else if (e.data.adAction === 'adAuth') {
+    // Parent sends fresh credentials after adReady — use them if not yet logged in
+    _adTryAutoLogin(e.data.email || '', e.data.password || '', e.data.api || '');
+  }
 });
 // Signal parent when ready
 if (window.parent !== window) {
