@@ -128,9 +128,9 @@ function _voipConnect() {
 
   _sio.on('voip_ice', function(data) {
     if (_rtc && data.candidate) {
-      try {
-        _rtc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(function(){});
-      } catch(e) {}
+      _rtc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(function(e) {
+        console.warn('[VoIP] addIceCandidate failed:', e);
+      });
     }
   });
 
@@ -585,6 +585,7 @@ function _renderContactList(list) {
 // ============================================================
 
 function _voipLoadHistory() {
+  if (_voipHistoryHidden) return;
   zkAPI('/api/voip/history?limit=50').then(function(data) {
     _voipRenderHistory(Array.isArray(data.calls) ? data.calls : []);
   }).catch(function() {
@@ -592,9 +593,14 @@ function _voipLoadHistory() {
   });
 }
 
+var _voipHistoryHidden = false;
+
 function voipClearHistory() {
-  // No server-side clear endpoint; just clear the UI
+  // History lives on the server; this hides it for the current session only.
+  // It will reappear on the next page load or refresh.
+  _voipHistoryHidden = true;
   _voipRenderHistory([]);
+  toast('Call history hidden for this session');
 }
 
 function _voipRenderHistory(calls) {
@@ -602,10 +608,12 @@ function _voipRenderHistory(calls) {
   if (!container) return;
   if (!calls || !calls.length) {
     container.innerHTML = '<div class="empty-state" style="padding:24px;text-align:center;color:var(--text2)">No call history</div>';
+    container._hist = [];
     return;
   }
   var me = _voipMe();
-  container.innerHTML = calls.map(function(h) {
+  container._hist = calls;
+  container.innerHTML = calls.map(function(h, idx) {
     var isOut   = h.caller === me;
     var peer    = isOut ? h.callee : h.caller;
     var emp     = _findEmpByBadge(peer);
@@ -622,9 +630,21 @@ function _voipRenderHistory(calls) {
       '</div>' +
       '<span style="font-family:var(--mono);font-size:11px;color:var(--text2)">' + _esc(dur) + '</span>' +
       '<span style="font-size:10px;color:' + statusColor + '">' + _esc(h.status || '') + '</span>' +
-      '<button class="voip-call-btn" onclick="voipCallEmployee(\'' + _esc2(peer) + '\',\'' + _esc2(pName) + '\')" title="Call back">📞</button>' +
+      '<button class="voip-call-btn" data-hidx="' + idx + '" title="Call back">📞</button>' +
     '</div>';
   }).join('');
+
+  // Delegated click for call-back buttons
+  container.onclick = function(e) {
+    var btn = e.target.closest('[data-hidx]');
+    if (!btn) return;
+    var idx  = parseInt(btn.getAttribute('data-hidx'), 10);
+    var h    = (container._hist || [])[idx];
+    if (!h) return;
+    var peer  = h.caller === _voipMe() ? h.callee : h.caller;
+    var emp   = _findEmpByBadge(peer);
+    voipCallEmployee(peer, emp ? emp.name : peer);
+  };
 }
 
 // ============================================================
@@ -747,10 +767,7 @@ function _esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-function _esc2(s) {
-  // Safe for JS string literals in HTML attribute (onclick="...('X')...") — escape backslash and single-quote
-  return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
+// (no _esc2 needed — all dynamic values use data-attributes and event delegation)
 
 // ============================================================
 //  CALL BUTTON: Chat integration
