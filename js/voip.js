@@ -79,7 +79,7 @@ function _voipConnect() {
 
   _voipSetStatus('◌ Connecting…', 'var(--yellow)');
 
-  _sio = io({ path: '/socket.io', transports: ['websocket', 'polling'] });
+  _sio = io({ path: '/socket.io', transports: ['polling', 'websocket'] });
 
   _sio.on('connect', function() {
     _voipSetStatus('◌ Registering…', 'var(--yellow)');
