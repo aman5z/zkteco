@@ -488,10 +488,30 @@ function _voipSetActiveBody(html) {
 //  CONTACT DIRECTORY  (online employees from server)
 // ============================================================
 
+/* VoIP-local employee list — used when STATE.empList is empty
+   (e.g. user lacks view_employees permission) */
+var _voipDirCache = [];
+
 function voipLoadContacts() {
-  // Merge employees list with online users from server
-  _voipBuildContacts();
-  _voipRenderContacts();
+  var emps = (window.STATE && Array.isArray(STATE.empList)) ? STATE.empList : [];
+  if (emps.length) {
+    // Employees already loaded — build contacts immediately
+    _voipBuildContacts();
+    _voipRenderContacts();
+  } else {
+    // Fetch a lightweight directory from the dedicated VoIP endpoint
+    // (accessible to all authenticated users, no extra permission needed)
+    fetch((typeof CFG !== 'undefined' ? CFG.zkUrl : '') + '/api/voip/directory', {
+      credentials: 'include'
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      _voipDirCache = Array.isArray(d.employees) ? d.employees : [];
+      _voipBuildContacts();
+      _voipRenderContacts();
+    }).catch(function() {
+      _voipBuildContacts();
+      _voipRenderContacts();
+    });
+  }
 
   // Also refresh call history
   _voipLoadHistory();
@@ -499,7 +519,10 @@ function voipLoadContacts() {
 
 function _voipBuildContacts() {
   var me = _voipMe();
-  var emps = (window.STATE && Array.isArray(STATE.empList)) ? STATE.empList : [];
+  // Prefer the main employee list; fall back to the VoIP-specific directory cache
+  var emps = (window.STATE && Array.isArray(STATE.empList) && STATE.empList.length)
+    ? STATE.empList
+    : _voipDirCache;
   var onlineMap = {};
   _voipOnline.forEach(function(u) { onlineMap[u.username] = u; });
 

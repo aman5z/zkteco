@@ -1058,10 +1058,15 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
       <div class="login-err" id="loginErr"></div>
     </div>
     <div class="login-footer">
-      <span>🔒 All activity is logged and audited</span>
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+        <div class="sb-dot muted" id="serverStatusDot" title="Checking server…" style="width:8px;height:8px;flex-shrink:0"></div>
+        <span id="loginServerStatus" style="color:var(--text2);white-space:nowrap">Checking…</span>
+      </div>
+      <button class="login-demo-btn" style="margin-left:auto" onclick="openSettings()">⚙ Settings</button>
       <button class="login-demo-btn" onclick="doDemo()">Demo</button>
     </div>
   </div>
+  <div id="loginServerUrl" style="margin-top:8px;font-size:10px;color:var(--text3);font-family:var(--mono);text-align:center;max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
