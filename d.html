@@ -3247,14 +3247,14 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
         <!-- ADD COUNTER -->
         <div class="mo" id="ad-addCounterModal">
           <div class="mw sm">
-            <div class="mt">🔢 New Token Counter<button class="mc" onclick="adCloseModal('addCounterModal')">✕</button></div>
+            <div class="mt">🔢 New Token Counter<button class="mc" onclick="adCloseModal('ad-addCounterModal')">✕</button></div>
             <div class="mb">
               <label>Counter Name *</label>
               <input type="text" id="ad-newCounterName" placeholder="e.g. General, VIP, Premium...">
               <div class="err-m" id="ad-cErr"></div>
             </div>
             <div class="mfoot">
-              <button class="wbtn" onclick="adCloseModal('addCounterModal')">Cancel</button>
+              <button class="wbtn" onclick="adCloseModal('ad-addCounterModal')">Cancel</button>
               <button class="wbtn pri" onclick="adSubmitAddCounter()">Add Counter</button>
             </div>
           </div>
@@ -3279,7 +3279,7 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
         <!-- NEW TICKET -->
         <div class="mo" id="ad-ticketModal">
           <div class="mw wide">
-            <div class="mt">🎫 New IT Ticket<button class="mc" onclick="adCloseModal('ticketModal')">✕</button></div>
+            <div class="mt">🎫 New IT Ticket<button class="mc" onclick="adCloseModal('ad-ticketModal')">✕</button></div>
             <div class="mb">
               <div class="r2">
                 <div><label>Your Name *</label><input type="text" id="ad-tkName" placeholder="Requester name"></div>
@@ -3298,7 +3298,7 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
               <div class="err-m" id="ad-tkErr"></div>
             </div>
             <div class="mfoot">
-              <button class="wbtn" onclick="adCloseModal('ticketModal')">Cancel</button>
+              <button class="wbtn" onclick="adCloseModal('ad-ticketModal')">Cancel</button>
               <button class="wbtn pri" onclick="adSubmitTicket()">Submit Ticket</button>
             </div>
           </div>
@@ -3307,7 +3307,7 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
         <!-- UPDATE TICKET -->
         <div class="mo" id="ad-updateTicketModal">
           <div class="mw sm">
-            <div class="mt">✏️ Update Ticket<button class="mc" onclick="adCloseModal('updateTicketModal')">✕</button></div>
+            <div class="mt">✏️ Update Ticket<button class="mc" onclick="adCloseModal('ad-updateTicketModal')">✕</button></div>
             <div class="mb">
               <label>Ticket ID</label>
               <input type="text" id="ad-utId" readonly style="background:var(--inp-ro);color:var(--sub);font-weight:bold;font-family:monospace">
@@ -3318,7 +3318,7 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
               <div class="err-m" id="ad-utErr"></div>
             </div>
             <div class="mfoot">
-              <button class="wbtn" onclick="adCloseModal('updateTicketModal')">Cancel</button>
+              <button class="wbtn" onclick="adCloseModal('ad-updateTicketModal')">Cancel</button>
               <button class="wbtn pri" onclick="adSubmitUpdateTicket()">Update</button>
             </div>
           </div>
@@ -4590,7 +4590,7 @@ async function delCounterById(id){
 function adOpenAddCounter(){
   document.getElementById("ad-newCounterName").value="";
   document.getElementById("ad-cErr").textContent="";
-  adOpenModal("addCounterModal");
+  adOpenModal("ad-addCounterModal");
 }
 async function adSubmitAddCounter(){
   if(isDemo()){ demoAddCounter(); return; }
@@ -4599,7 +4599,7 @@ async function adSubmitAddCounter(){
   adSpin(true);
   try{
     await fetch(adAPI,{method:"POST",body:new URLSearchParams({action:"addCounter",token:adTok,name})});
-    adCloseModal("addCounterModal"); adToast("✅ Counter '"+name+"' added."); await adLoadCounters();
+    adCloseModal("ad-addCounterModal"); adToast("✅ Counter '"+name+"' added."); await adLoadCounters();
   }catch(e){ document.getElementById("ad-cErr").textContent="Error: "+e; }
   adSpin(false);
 }
@@ -4691,7 +4691,7 @@ function adOpenNewTicket(){
   ["tkName","tkTitle","tkDesc"].forEach(id=>document.getElementById(id).value="");
   document.getElementById("ad-tkPri").value="Medium";
   document.getElementById("ad-tkErr").textContent="";
-  adOpenModal("ticketModal");
+  adOpenModal("ad-ticketModal");
 }
 async function adSubmitTicket(){
   if(isDemo()){ demoSubmitTicket(); return; }
@@ -4707,7 +4707,7 @@ async function adSubmitTicket(){
       action:"createTicket",token:adTok,requesterName:name,title,description:desc,priority:pri
     })});
     const t=await r.text();
-    adCloseModal("ticketModal"); adToast("✅ "+t); await adLoadTickets(); adLoadDashboard();
+    adCloseModal("ad-ticketModal"); adToast("✅ "+t); await adLoadTickets(); adLoadDashboard();
   }catch(e){ err.textContent="Error: "+e; }
   adSpin(false);
 }
@@ -4717,7 +4717,7 @@ function openUpdateTicketById(id,status,assigned){
   document.getElementById("ad-utStatus").value=status;
   document.getElementById("ad-utAssigned").value=assigned==="Unassigned"?"":assigned;
   document.getElementById("ad-utErr").textContent="";
-  adOpenModal("updateTicketModal");
+  adOpenModal("ad-updateTicketModal");
 }
 async function adSubmitUpdateTicket(){
   if(isDemo()){ demoUpdateTicket(); return; }
@@ -4727,7 +4727,7 @@ async function adSubmitUpdateTicket(){
   adSpin(true);
   try{
     await fetch(adAPI,{method:"POST",body:new URLSearchParams({action:"updateTicket",token:adTok,ticketId:id,status,assignedTo})});
-    adCloseModal("updateTicketModal"); adToast("✅ Ticket updated."); await adLoadTickets();
+    adCloseModal("ad-updateTicketModal"); adToast("✅ Ticket updated."); await adLoadTickets();
     if(adSelTicketId===id) selTicket(id);
   }catch(e){ document.getElementById("ad-utErr").textContent="Error: "+e; }
   adSpin(false);
@@ -5079,7 +5079,7 @@ function demoAddCounter(){
   if(!name){document.getElementById("addCtrErr").textContent="Name required.";return;}
   const prefix=String.fromCharCode(65+adAllCounters.length%26);
   adAllCounters.push({id:"demo-"+Date.now(),name,value:1,key:"",prefix});
-  adCloseModal("addCounterModal"); demoBlock("Counter added"); adRenderCounters();
+  adCloseModal("ad-addCounterModal"); demoBlock("Counter added"); adRenderCounters();
 }
 function demoRenameCounter(){
   const modal=document.getElementById("renameCounterModal");
@@ -5097,12 +5097,12 @@ function demoSubmitTicket(){
   const due=new Date(Date.now()+slaH*3600000);
   const tid="DEMO-"+("0000"+adAllTickets.length).slice(-4);
   adAllTickets.unshift({id:tid,created:new Date().toISOString(),createdBy:adMyEmail,title,desc,priority:pri,status:"Open",assignedTo:"Unassigned",lastUpdated:new Date().toISOString(),dueTime:due.toISOString(),requesterName:name});
-  adCloseModal("ticketModal"); demoBlock("Ticket created"); renderTickets();
+  adCloseModal("ad-ticketModal"); demoBlock("Ticket created"); renderTickets();
 }
 function demoUpdateTicket(){
   const id=document.getElementById("ad-utId").value, status=document.getElementById("ad-utStatus").value, assigned=document.getElementById("ad-utAssigned").value.trim()||"Unassigned";
   const t=adAllTickets.find(x=>x.id===id); if(t){t.status=status;t.assignedTo=assigned;}
-  adCloseModal("updateTicketModal"); demoBlock("Ticket updated");
+  adCloseModal("ad-updateTicketModal"); demoBlock("Ticket updated");
   renderTickets(); if(adSelTicketId===id) selTicket(id);
 }
 
