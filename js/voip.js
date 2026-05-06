@@ -507,7 +507,8 @@ function voipLoadContacts() {
       _voipDirCache = Array.isArray(d.employees) ? d.employees : [];
       _voipBuildContacts();
       _voipRenderContacts();
-    }).catch(function() {
+    }).catch(function(err) {
+      console.warn('[VoIP] directory fetch failed:', err && err.message || err);
       _voipBuildContacts();
       _voipRenderContacts();
     });

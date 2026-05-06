@@ -6041,7 +6041,7 @@ def voip_api_directory():
         ).to_dict("records")
         return jsonify({"employees": records})
     except Exception as e:
-        return jsonify({"employees": [], "error": str(e)})
+        return jsonify({"employees": [], "error": "Failed to load directory"})
 
 
 # ==============================================================================

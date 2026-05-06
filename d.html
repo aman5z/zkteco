@@ -1024,6 +1024,10 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
 .login-footer{border-top:1px solid var(--border);padding:10px 24px;font-size:11px;color:var(--text2);display:flex;align-items:center;gap:8px}
 .login-demo-btn{margin-left:auto;background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 12px;cursor:pointer;font-size:11px;color:var(--text2);transition:border-color .15s,color .15s}
 .login-demo-btn:hover{border-color:var(--accent);color:var(--accent)}
+.login-status-row{display:flex;align-items:center;gap:5px;flex-shrink:0}
+.login-status-dot{width:8px;height:8px;flex-shrink:0}
+.login-status-text{color:var(--text2);white-space:nowrap}
+.login-server-url{margin-top:8px;font-size:10px;color:var(--text3);font-family:var(--mono);text-align:center;max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 </style>
 </head>
@@ -1058,15 +1062,15 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
       <div class="login-err" id="loginErr"></div>
     </div>
     <div class="login-footer">
-      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
-        <div class="sb-dot muted" id="serverStatusDot" title="Checking server…" style="width:8px;height:8px;flex-shrink:0"></div>
-        <span id="loginServerStatus" style="color:var(--text2);white-space:nowrap">Checking…</span>
+      <div class="login-status-row">
+        <div class="sb-dot muted login-status-dot" id="serverStatusDot" title="Checking server…"></div>
+        <span id="loginServerStatus" class="login-status-text">Checking…</span>
       </div>
       <button class="login-demo-btn" style="margin-left:auto" onclick="openSettings()">⚙ Settings</button>
       <button class="login-demo-btn" onclick="doDemo()">Demo</button>
     </div>
   </div>
-  <div id="loginServerUrl" style="margin-top:8px;font-size:10px;color:var(--text3);font-family:var(--mono);text-align:center;max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+  <div id="loginServerUrl" class="login-server-url"></div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
