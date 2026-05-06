@@ -2,7 +2,7 @@
   "name": "ZKTeco Enterprise ERP",
   "short_name": "ERP Console",
   "description": "ZKTeco Enterprise ERP Management System",
-  "start_url": "/",
+  "start_url": "/d.html",
   "display": "standalone",
   "background_color": "#12141c",
   "theme_color": "#00c8ff",

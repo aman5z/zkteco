@@ -456,7 +456,7 @@ function autoFillFromBadge(val){
 function populateEmpSuggest(){
   const dl=el('empBadgeSuggest');
   if(!dl)return;
-  dl.innerHTML=STATE.empList.map(e=>`<option value="${e.code||e.badge}">${e.name} (${e.dept})</option>`).join('');
+  dl.innerHTML=STATE.empList.map(e=>`<option value="${esc(e.code||e.badge)}">${esc(e.name)} (${esc(e.dept)})</option>`).join('');
 }
 
 async function connectGAS(){
@@ -679,6 +679,7 @@ async function onLoginSuccess(user){
 
   // Update header
   if(el('loginScreen'))el('loginScreen').style.display='none';
+  el('appShell').style.display='';
   el('appShell').classList.add('visible');
 
   const avatars = ['👨‍💼','👩‍💼','👨‍💻','👩‍💻','🦸‍♂️','🦸‍♀️','🧙‍♂️','🧙‍♀️','🥷','🤖'];
@@ -730,13 +731,14 @@ async function onLoginSuccess(user){
     loadEmployees();
     if(can('tickets'))loadTickets();
     if(can('tokens'))loadCounters();
+    if(typeof loadAnnouncements==='function') loadAnnouncements();
   }
 }
 
 function applyPermissions(){
   // Sidebar visibility based on role/perms
   const rules={
-    'sb-users':'users','sb-audit':'audit','sb-drive':'storage','sb-admin':'admin',
+    'sb-employees':'users','sb-audit':'audit','sb-drive':'storage','sb-admin':'admin',
   };
   Object.entries(rules).forEach(([sid,perm])=>{
     const el2=el(sid);
@@ -746,7 +748,10 @@ function applyPermissions(){
     el('sb-admin').style.display='none';
     if(!can('audit'))el('sb-audit').style.display='none';
     if(!can('storage'))el('sb-drive').style.display='none';
-    if(!can('users'))el('sb-users').style.display='none';
+    if(!can('users')){
+      const sbEmp=el('sb-employees');
+      if(sbEmp)sbEmp.style.display='none';
+    }
     if(!can('tokens'))el('sb-counters').style.display='none';
     if(!can('tickets'))el('sb-tickets').style.display='none';
   }
@@ -760,6 +765,7 @@ function doLogout(){
   }
   STATE={...STATE,user:null,token:null,isDemo:false};
   el('appShell').classList.remove('visible');
+  el('appShell').style.display='none';
   if(el('loginScreen'))el('loginScreen').style.display='flex';
   if(el('loginPass'))el('loginPass').value='';
   if(el('loginErr'))el('loginErr').style.display='none';
