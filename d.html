@@ -1874,7 +1874,7 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
             </div>
             <div class="settings-section">
               <h3>📞 VoIP / Asterisk Settings</h3>
-              <p style="font-size:11px;color:var(--text2);margin-bottom:10px">Configure your Asterisk PBX WebSocket endpoint. Asterisk must have the <code style="background:var(--card2);padding:1px 4px;border-radius:3px">res_http_websocket</code> and <code style="background:var(--card2);padding:1px 4px;border-radius:3px">chan_pjsip</code> modules enabled. Point the WebSocket URL to <code style="background:var(--card2);padding:1px 4px;border-radius:3px">wss://your-pbx:8089/ws</code>.</p>
+              <p style="font-size:11px;color:var(--text2);margin-bottom:10px">Configure your Asterisk PBX WebSocket endpoint. Asterisk must have the <code style="background:var(--card2);padding:1px 4px;border-radius:3px">res_http_websocket</code> and <code style="background:var(--card2);padding:1px 4px;border-radius:3px">chan_pjsip</code> modules enabled. Point the WebSocket URL to <code style="background:var(--card2);padding:1px 4px;border-radius:3px">wss://your-pbx:8089/ws</code>. Verify modules with <code style="background:var(--card2);padding:1px 4px;border-radius:3px">asterisk -rx "module show like websocket"</code> on the server. See <a href="https://docs.asterisk.org/Configuration/WebRTC/" target="_blank" style="color:var(--accent)">Asterisk WebRTC docs</a> for full setup.</p>
               <div class="form-group"><label>Asterisk WebSocket URL</label><input class="form-control" id="sVoipWs" placeholder="wss://pbx.company.com:8089/ws"></div>
               <div class="form-row">
                 <div class="form-group"><label>SIP Extension</label><input class="form-control" id="sVoipExt" placeholder="1001"></div>
@@ -2604,7 +2604,7 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
 <script src="js/ittools.js"></script>
 <script src="js/init.js"></script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jssip/3.10.0/jssip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jssip/3.10.0/jssip.min.js" integrity="sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb" crossorigin="anonymous"></script>
 <script src="js/voip.js"></script>
 
 <script>

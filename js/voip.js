@@ -77,7 +77,7 @@ function voipConnect(){
     var socket = new JsSIP.WebSocketInterface(c.ws);
     var cfg = {
       sockets       : [socket],
-      uri           : 'sip:' + c.ext + '@' + (c.realm || c.ws.replace(/wss?:\/\/([^:/]+).*/,'$1')),
+      uri           : 'sip:' + c.ext + '@' + (c.realm || c.ws.replace(/wss?:\/\/([^/]+).*/,'$1')),
       password      : c.pass,
       display_name  : c.display || c.ext,
       register      : true,
@@ -145,7 +145,12 @@ function voipCallTarget(target, name){
   if(_voipSession){ toast('Already in a call'); return; }
 
   var c = _voipCfg();
-  var uri = target.includes('@') ? target : 'sip:' + target + '@' + (c.realm || '');
+  var domain = c.realm;
+  if(!domain){
+    var wsMatch = c.ws.match(/wss?:\/\/([^/]+)/);
+    domain = wsMatch ? wsMatch[1] : 'localhost';
+  }
+  var uri = target.includes('@') ? target : 'sip:' + target + '@' + domain;
 
   var options = {
     mediaConstraints: { audio: true, video: false },
@@ -361,8 +366,7 @@ function _voipPlayRingtone(){
   try {
     // Simple beep via AudioContext — no file needed
     var ctx = new (window.AudioContext || window.webkitAudioContext)();
-    var interval = setInterval(function(){
-      if(!_voipRingtone) { clearInterval(interval); return; }
+    var intervalId = setInterval(function(){
       var osc = ctx.createOscillator();
       var gain = ctx.createGain();
       osc.connect(gain); gain.connect(ctx.destination);
@@ -378,7 +382,7 @@ function _voipPlayRingtone(){
         osc2.start(); osc2.stop(ctx.currentTime + 0.4);
       }, 500);
     }, 3000);
-    _voipRingtone = { stop: function(){ clearInterval(interval); try{ ctx.close(); }catch(e){} } };
+    _voipRingtone = { stop: function(){ clearInterval(intervalId); try{ ctx.close(); }catch(e){} } };
   } catch(e){ _voipRingtone = null; }
 }
 
@@ -428,17 +432,31 @@ function _voipRenderContacts(list){
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2);font-size:11px">No contacts.<br>Add employees or configure extensions.</div>';
     return;
   }
-  container.innerHTML = list.map(function(c){
-    var initials = (c.name||'?').split(' ').map(function(w){ return w[0]; }).slice(0,2).join('').toUpperCase();
-    return '<div class="voip-user-card" onclick="voipCallTarget(\'' + _esc(c.ext) + '\',\'' + _esc(c.name) + '\')">' +
+  // Store contacts list for event delegation lookups
+  container._voipList = list;
+  container.innerHTML = list.map(function(c, idx){
+    var initials = (c.name||'?').split(' ').filter(function(w){ return w; }).map(function(w){ return w[0]; }).slice(0,2).join('').toUpperCase();
+    return '<div class="voip-user-card" data-voip-idx="' + idx + '">' +
       '<div class="voip-user-av">' + _esc(initials) + '</div>' +
       '<div class="voip-user-info">' +
         '<div class="voip-user-name">' + _esc(c.name||c.ext) + '</div>' +
         '<div class="voip-user-dept">ext ' + _esc(String(c.ext)) + (c.dept ? ' · ' + _esc(c.dept) : '') + '</div>' +
       '</div>' +
-      '<button class="voip-call-btn" onclick="event.stopPropagation();voipCallTarget(\'' + _esc(c.ext) + '\',\'' + _esc(c.name) + '\')" title="Call">📞</button>' +
+      '<button class="voip-call-btn" data-voip-btn="' + idx + '" title="Call">📞</button>' +
     '</div>';
   }).join('');
+
+  // Single delegated click handler
+  container.onclick = function(e){
+    var btn  = e.target.closest('[data-voip-btn]');
+    var card = e.target.closest('[data-voip-idx]');
+    var el2  = btn || card;
+    if(!el2) return;
+    if(btn) e.stopPropagation();
+    var idx = parseInt(el2.getAttribute(btn ? 'data-voip-btn' : 'data-voip-idx'), 10);
+    var contact = (container._voipList || [])[idx];
+    if(contact) voipCallTarget(contact.ext, contact.name);
+  };
 }
 
 /* ── Call history ───────────────────────────────────────────── */
@@ -485,7 +503,7 @@ function _voipRenderHistory(){
 }
 
 /* ── Helpers ────────────────────────────────────────────────── */
-function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 function _voipFmtDur(sec){
   var m = Math.floor(sec/60), s = sec%60;
@@ -505,6 +523,9 @@ function _voipFmtTime(iso){
 }
 
 /* ── Init ───────────────────────────────────────────────────── */
+// Delay before auto-connect to allow the page to fully render and
+// other scripts (shared.js, init.js) to complete their own init work.
+const VOIP_AUTO_CONNECT_DELAY_MS = 3000;
 (function _voipInit(){
   _voipLoadHistory();
   // Auto-connect if settings are present
@@ -513,7 +534,7 @@ function _voipFmtTime(iso){
     var c = _voipCfg();
     if(c.ws && c.ext && c.pass){
       // Attempt silent auto-connect after a short delay
-      setTimeout(voipConnect, 3000);
+      setTimeout(voipConnect, VOIP_AUTO_CONNECT_DELAY_MS);
     }
   });
 })();
