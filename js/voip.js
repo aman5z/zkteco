@@ -47,7 +47,7 @@ function voipInit() {
   }
 
   // Check if server has voip enabled
-  fetch('/api/voip/status').then(function(r){ return r.json(); }).then(function(d){
+  fetch(CFG.zkUrl+'/api/voip/status').then(function(r){ return r.json(); }).then(function(d){
     if (!d.enabled) {
       _voipSetStatus('● Disabled — install flask-socketio', 'var(--yellow)');
       _voipShowInstallHint();

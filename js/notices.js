@@ -44,5 +44,5 @@ async function delAnnouncement(id){
   }catch(e){toast('❌ '+e.message)}
 }
 
-// Initialize Announcements on start
-setTimeout(loadAnnouncements, 1000);
+// Initialize Announcements on start — only after login to avoid spurious 401 requests
+setTimeout(function(){if(window.STATE&&STATE.user)loadAnnouncements();}, 1000);
