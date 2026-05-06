@@ -1001,11 +1001,68 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
 /* CSS variable aliases for IT Tools (ad.html compat) */
 :root{--sub:var(--text3);--txt:var(--text)}
 
+/* ═══════════════════════════════════════════════════════════
+   LOGIN SCREEN
+════════════════════════════════════════════════════════════ */
+#loginScreen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;padding:16px;flex-direction:column}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);width:380px;max-width:100%;overflow:hidden}
+.login-brand{background:linear-gradient(135deg,var(--accent),#005588);padding:28px 24px;text-align:center;color:#fff}
+.login-brand-icon{width:52px;height:52px;background:rgba(255,255,255,.18);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 12px;border:1px solid rgba(255,255,255,.25)}
+.login-brand h2{font-size:15px;font-weight:700;margin:0;letter-spacing:.2px}
+.login-brand p{font-size:11px;color:rgba(255,255,255,.65);margin:5px 0 0;font-family:var(--mono)}
+.login-body{padding:22px 24px}
+.login-body label{display:block;font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.login-body input[type=text],.login-body input[type=password]{width:100%;padding:9px 11px;border:1px solid var(--border2);border-radius:var(--radius-sm);font-size:13px;background:var(--card);color:var(--text);margin-bottom:14px;box-sizing:border-box;transition:border-color .15s,box-shadow .15s}
+.login-body input[type=text]:focus,.login-body input[type=password]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.login-remember{display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer}
+.login-remember input{width:auto;margin:0;accent-color:var(--accent)}
+.login-remember span{font-size:12px;color:var(--text2)}
+.login-btn{width:100%;padding:10px;background:linear-gradient(135deg,var(--accent),#0099cc);color:var(--bg);border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:opacity .15s,transform .1s}
+.login-btn:hover{opacity:.9;transform:translateY(-1px)}
+.login-btn:active{transform:translateY(0)}
+.login-err{color:var(--red);font-size:12px;margin-top:10px;min-height:16px;display:none}
+.login-footer{border-top:1px solid var(--border);padding:10px 24px;font-size:11px;color:var(--text2);display:flex;align-items:center;gap:8px}
+.login-demo-btn{margin-left:auto;background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 12px;cursor:pointer;font-size:11px;color:var(--text2);transition:border-color .15s,color .15s}
+.login-demo-btn:hover{border-color:var(--accent);color:var(--accent)}
+
 </style>
 </head>
 <body>
 <div id="spinner"></div>
 <div id="toast"></div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LOGIN SCREEN
+════════════════════════════════════════════════════════════ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-brand-icon"><span id="loginLogoIcon">🏢</span></div>
+      <h2 id="loginCompanyName">ERP Console</h2>
+      <p id="loginDomainLabel">enterprise.local</p>
+    </div>
+    <div class="login-body">
+      <label for="loginUser">Employee ID / Username</label>
+      <input type="text" id="loginUser" placeholder="Enter your ID or username"
+             autocomplete="username"
+             onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
+      <label for="loginPass">Password</label>
+      <input type="password" id="loginPass" placeholder="Password"
+             autocomplete="current-password"
+             onkeydown="if(event.key==='Enter')doLogin()">
+      <label class="login-remember">
+        <input type="checkbox" id="rememberMe">
+        <span>Remember me</span>
+      </label>
+      <button class="login-btn" onclick="doLogin()">SIGN IN →</button>
+      <div class="login-err" id="loginErr"></div>
+    </div>
+    <div class="login-footer">
+      <span>🔒 All activity is logged and audited</span>
+      <button class="login-demo-btn" onclick="doDemo()">Demo</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════════
      APP SHELL
@@ -2600,7 +2657,7 @@ input:checked+.slider:before{transform:translateX(16px);background:#000}
 <script src="js/ittools.js"></script>
 <script src="js/init.js"></script>
 
-<script src="/socket.io/socket.io.js"></script>
+<script src="/socket.io/socket.io.js" onerror="(function(){var s=document.createElement('script');s.src='https://cdn.socket.io/4.7.5/socket.io.min.js';s.onload=function(){if(typeof voipInit==='function')setTimeout(voipInit,500);};document.head.appendChild(s);})()"></script>
 <script src="js/voip.js"></script>
 
 <script>

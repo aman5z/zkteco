@@ -90,6 +90,8 @@ window.addEventListener('DOMContentLoaded', async () => {
             }
         }
     } catch(e) {}
-    // No active session — load the app shell directly without authentication
-    await onLoginSuccess({username:'guest',name:'Guest',role:'employee',badge:'',permissions:{},theme:ls('theme')||'dark',source:'zk'});
+    // No active session — show the login screen
+    if (el('loginScreen')) el('loginScreen').style.display = 'flex';
+    const rem = localStorage.getItem('rememberedUser');
+    if (rem && el('loginUser')) el('loginUser').value = rem;
 });
