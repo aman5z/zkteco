@@ -708,6 +708,10 @@ async function onLoginSuccess(user){
   startClock();
   startCachePoll();
 
+  // Kick off VoIP connection right after login (STATE.user is now set).
+  // Small delay lets the login UI settle before the socket.io handshake begins.
+  if(typeof voipInit==='function') setTimeout(voipInit, 500);
+
   // Load initial data based on server status
   if(STATE.serverStatus === 'offline' || user.source === 'gas') {
     let offlineBanner = document.createElement('div');
@@ -806,7 +810,10 @@ function showPage(page){
   if(page==='settings'){applyBranding();setTheme(CFG.theme);loadEmailSettings();loadTelegramSettings();if(typeof loadVoipSettings!=='undefined')loadVoipSettings();}
   if(page==='messages')loadMessages();
   if(page==='notes')loadNotes();
-  if(page==='voip'&&typeof voipLoadContacts!=='undefined')voipLoadContacts();
+  if(page==='voip'){
+    if(typeof voipInit!=='undefined')voipInit();
+    if(typeof voipLoadContacts!=='undefined')voipLoadContacts();
+  }
   if(_msgPollTimer){ clearInterval(_msgPollTimer); _msgPollTimer=null; }
   if(page==='messages'){
     _msgPollTimer = setInterval(()=>{ if(STATE.currentPage==='messages') loadMessages(); }, 15000);
