@@ -796,9 +796,10 @@ function showPage(page){
   if(page==='attlogs'){const now=new Date();if(el('logsTo'))el('logsTo').valueAsDate=now;const f=new Date(now);f.setDate(f.getDate()-1);if(el('logsFrom'))el('logsFrom').valueAsDate=f;loadAttLogs();}
   if(page==='terminal'){const url=_termUrl();if(url)loadTerminalFrame();else showTermSetup();}
   if(page==='sql'){/* ready */}
-  if(page==='settings'){applyBranding();setTheme(CFG.theme);loadEmailSettings();loadTelegramSettings()}
+  if(page==='settings'){applyBranding();setTheme(CFG.theme);loadEmailSettings();loadTelegramSettings();if(typeof loadVoipSettings!=='undefined')loadVoipSettings();}
   if(page==='messages')loadMessages();
   if(page==='notes')loadNotes();
+  if(page==='voip'&&typeof voipLoadContacts!=='undefined')voipLoadContacts();
   if(_msgPollTimer){ clearInterval(_msgPollTimer); _msgPollTimer=null; }
   if(page==='messages'){
     _msgPollTimer = setInterval(()=>{ if(STATE.currentPage==='messages') loadMessages(); }, 15000);

@@ -2363,6 +2363,17 @@ function toggleFullScreen(){
   else document.exitFullscreen();
 }
 
+// ── EMBEDDED MODE (postMessage from parent d.html) ──
+window.addEventListener('message', function(e) {
+  if (!e.data || e.data.adAction !== 'showTab') return;
+  const tab = e.data.tab;
+  if (tab) switchTab(tab);
+});
+// Signal parent when ready
+if (window.parent !== window) {
+  window.parent.postMessage({ adReady: true }, '*');
+}
+
 </script>
 </body>
 </html>
