@@ -6027,11 +6027,29 @@ def voip_api_status():
     return jsonify({"enabled": SOCKETIO_AVAILABLE})
 
 
+@app.route('/api/voip/directory')
+def voip_api_directory():
+    """Return basic employee list for VoIP contacts directory.
+    Accessible to all authenticated users so the call directory works
+    regardless of the view_employees permission."""
+    if 'username' not in session:
+        return jsonify({'error': 'Not authenticated', 'auth_required': True}), 401
+    try:
+        df = load_employees_all()
+        records = df[["Badgenumber", "Name", "DEPTNAME"]].rename(
+            columns={"Badgenumber": "code", "Name": "name", "DEPTNAME": "dept"}
+        ).to_dict("records")
+        return jsonify({"employees": records})
+    except Exception as e:
+        return jsonify({"employees": [], "error": "Failed to load directory"})
+
+
 # ==============================================================================
 #  MAIN
 # ==============================================================================
 
 init_punch_db()
+_init_voip_db()
 
 
 if __name__ == "__main__":
@@ -6053,7 +6071,6 @@ if __name__ == "__main__":
     print("  Default login -> admin / {0}".format(DEFAULT_ADMIN_PASSWORD))
     print("="*58 + "\n")
     start_background_refresh()
-    _init_voip_db()
     if SOCKETIO_AVAILABLE and socketio:
         print("  VoIP calling  -> enabled (WebRTC/SocketIO)")
         socketio.run(app, host="0.0.0.0", port=5000, debug=False,

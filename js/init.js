@@ -22,10 +22,12 @@
       if(r.ok) {
         STATE.serverStatus = 'online';
         if(el('serverStatusDot')) { el('serverStatusDot').className = 'sb-dot green'; el('serverStatusDot').title = 'Server Online'; }
+        if(el('loginServerStatus')) { el('loginServerStatus').textContent = 'Server Online'; el('loginServerStatus').style.color = 'var(--green)'; }
       } else throw new Error();
     } catch(e) {
       STATE.serverStatus = 'offline';
       if(el('serverStatusDot')) { el('serverStatusDot').className = 'sb-dot red'; el('serverStatusDot').title = 'Server Offline'; }
+      if(el('loginServerStatus')) { el('loginServerStatus').textContent = 'Server Offline'; el('loginServerStatus').style.color = 'var(--red)'; }
     }
   }, 5000);
 

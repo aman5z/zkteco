@@ -134,6 +134,7 @@ function applyBranding(){
   if(el('loginLogoIcon'))el('loginLogoIcon').textContent=em;
   if(el('loginCompanyName'))el('loginCompanyName').textContent=co;
   if(el('loginDomainLabel'))el('loginDomainLabel').textContent=dom;
+  if(el('loginServerUrl'))el('loginServerUrl').textContent=CFG.zkUrl||'';
   el('hLogoIcon').textContent=em;
   el('hCompanyName').textContent=co;
   el('hDomain').textContent=dom;
